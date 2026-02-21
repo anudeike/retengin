@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { PointsHistory } from '@/components/customer/PointsHistory'
 import { RewardProgress } from '@/components/customer/RewardProgress'
+import { RealtimeWallet } from '@/components/customer/RealtimeWallet'
+import { RewardUnlockToast } from '@/components/customer/RewardUnlockToast'
 
 interface Props {
   params: Promise<{ merchantSlug: string }>
@@ -63,6 +65,16 @@ export default async function MerchantWalletPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      {/* Realtime subscription — triggers router.refresh() on new transactions */}
+      <RealtimeWallet customerId={customer.id} onPointsUpdate={() => {
+        // Handled by the router refresh in the client component
+      }} />
+      {/* Reward unlock toast */}
+      <RewardUnlockToast
+        previousBalance={Math.max(0, balance - 0)}
+        currentBalance={balance}
+        rewards={rewards ?? []}
+      />
       <div className="max-w-lg mx-auto p-6">
         {/* Back link */}
         <Link href="/wallet" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
