@@ -2,6 +2,29 @@
 -- Migration 002: Enable RLS + Policies
 -- ============================================================
 
+-- Helper functions must exist before any policy references them.
+-- These are redefined again in 003_helper_functions.sql with CREATE OR REPLACE.
+CREATE OR REPLACE FUNCTION public.get_user_role()
+RETURNS app_role
+LANGUAGE sql STABLE SECURITY DEFINER
+AS $$
+  SELECT role FROM public.user_roles WHERE user_id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_merchant_id()
+RETURNS UUID
+LANGUAGE sql STABLE SECURITY DEFINER
+AS $$
+  SELECT id FROM public.merchants WHERE auth_user_id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_customer_id()
+RETURNS UUID
+LANGUAGE sql STABLE SECURITY DEFINER
+AS $$
+  SELECT id FROM public.customers WHERE auth_user_id = auth.uid();
+$$;
+
 -- Enable RLS on all tables
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merchants ENABLE ROW LEVEL SECURITY;
