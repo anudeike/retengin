@@ -1,4 +1,79 @@
-// Phase 3 — full implementation in Phase 3 tasks
-export default function WalletPage() {
-  return <div>Wallet page — coming soon</div>
+import { redirect } from 'next/navigation'
+import { createServerClient } from '@/lib/supabase/server'
+import { WalletCard } from '@/components/customer/WalletCard'
+
+export default async function WalletPage() {
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/')
+
+  // Fetch customer record
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id, display_name, email')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (!customer) redirect('/')
+
+  // Fetch all merchant balances for this customer (join merchants for names/slugs)
+  const { data: balances } = await supabase
+    .from('customer_merchant_balances')
+    .select('balance, merchant_id, merchants(business_name, slug, logo_url)')
+    .eq('customer_id', customer.id)
+    .gt('balance', 0)
+    .order('balance', { ascending: false })
+
+  const totalPoints = (balances ?? []).reduce((sum, b) => sum + b.balance, 0)
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-lg mx-auto p-6">
+        {/* Header */}
+        <div className="mb-8">
+          <p className="text-sm text-gray-500">Welcome back</p>
+          <h1 className="text-2xl font-bold">{customer.display_name ?? customer.email}</h1>
+        </div>
+
+        {/* Total points */}
+        <div className="bg-black text-white rounded-2xl p-6 mb-6">
+          <p className="text-sm opacity-70 mb-1">Total Taplo Points</p>
+          <p className="text-5xl font-bold">{totalPoints.toLocaleString()}</p>
+          <p className="text-xs opacity-50 mt-2">across {(balances ?? []).length} merchants</p>
+        </div>
+
+        {/* Per-merchant balances */}
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Your Points
+        </h2>
+
+        {(balances ?? []).length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-4xl mb-3">🎁</p>
+            <p className="font-medium">No points yet</p>
+            <p className="text-sm mt-1">Scan a merchant&apos;s QR code to start earning.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(balances ?? []).map((b) => {
+              const m = b.merchants as unknown as { business_name: string; slug: string; logo_url: string | null } | null
+              if (!m) return null
+              return (
+                <WalletCard
+                  key={b.merchant_id}
+                  merchantSlug={m.slug}
+                  merchantName={m.business_name}
+                  balance={b.balance}
+                  logoUrl={m.logo_url}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </main>
+  )
 }
