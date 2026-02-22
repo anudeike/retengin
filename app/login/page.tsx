@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/types/database.types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -14,36 +17,26 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     const supabase = createBrowserClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
-
     const { error } = await supabase.auth.signInWithOtp({
       email: email.toLowerCase().trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
-      },
+      options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
     })
-
     setLoading(false)
-
-    if (error) {
-      setError(error.message)
-      return
-    }
-
+    if (error) { setError(error.message); return }
     setSubmitted(true)
   }
 
   if (submitted) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <div className="max-w-sm w-full">
-          <h1 className="text-2xl font-bold mb-3">Check your email</h1>
-          <p className="text-gray-600">
-            We sent a magic link to <span className="font-medium text-black">{email}</span>.
+        <div className="max-w-sm w-full space-y-2">
+          <h1 className="text-2xl font-bold">Check your email</h1>
+          <p className="text-muted-foreground">
+            We sent a magic link to <span className="font-medium text-foreground">{email}</span>.
             Click it to sign in.
           </p>
         </div>
@@ -53,29 +46,27 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      <div className="max-w-sm w-full">
-        <h1 className="text-2xl font-bold mb-2 text-center">Sign in to Taplo</h1>
-        <p className="text-gray-500 text-sm text-center mb-8">
-          Enter your email and we&apos;ll send you a magic link.
-        </p>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-          />
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-black text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
-          >
+      <div className="max-w-sm w-full space-y-6">
+        <div className="space-y-1 text-center">
+          <h1 className="text-2xl font-bold">Sign in to Taplo</h1>
+          <p className="text-muted-foreground text-sm">Enter your email and we&apos;ll send you a magic link.</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="login-email">Email</Label>
+            <Input
+              id="login-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'Sending…' : 'Send magic link'}
-          </button>
+          </Button>
         </form>
       </div>
     </main>

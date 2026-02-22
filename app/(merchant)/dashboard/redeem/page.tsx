@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RedemptionModal } from '@/components/merchant/RedemptionModal'
-import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 
 export default function RedeemPage() {
   const [merchantId, setMerchantId] = useState<string | null>(null)
@@ -26,22 +26,22 @@ export default function RedeemPage() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-6">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
-          ← Dashboard
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2">
+          <Link href="/dashboard">← Dashboard</Link>
+        </Button>
         <h1 className="text-2xl font-bold mb-2">Redeem Points</h1>
-        <p className="text-gray-500 mb-8">Look up a customer by email and redeem a reward.</p>
+        <p className="text-muted-foreground mb-8">Look up a customer by email and redeem a reward.</p>
 
-        <button
-          type="button"
+        <Button
+          size="lg"
+          className="w-full py-4 text-lg"
           disabled={!merchantId}
           onClick={() => setShowModal(true)}
-          className="w-full py-4 bg-black text-white rounded-xl font-medium text-lg hover:bg-gray-800 disabled:opacity-40 transition"
         >
           Start redemption
-        </button>
+        </Button>
 
         {showModal && merchantId && (
           <RedemptionModal merchantId={merchantId} onClose={() => setShowModal(false)} />

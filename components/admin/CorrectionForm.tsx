@@ -1,6 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Merchant {
   id: string
@@ -31,11 +42,9 @@ export function CorrectionForm({ merchants, onSubmit }: CorrectionFormProps) {
     const d = parseInt(delta, 10)
     if (isNaN(d) || d === 0) { setResult({ ok: false, message: 'Delta cannot be zero' }); return }
     if (!note.trim()) { setResult({ ok: false, message: 'Note is required' }); return }
-
     setLoading(true)
     const res = await onSubmit({ merchantId, customerEmail, delta: d, note })
     setLoading(false)
-
     if (res.error) {
       setResult({ ok: false, message: res.error })
     } else {
@@ -48,72 +57,71 @@ export function CorrectionForm({ merchants, onSubmit }: CorrectionFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium mb-1">Merchant</label>
-        <select
-          value={merchantId}
-          onChange={(e) => setMerchantId(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-        >
-          {merchants.map((m) => (
-            <option key={m.id} value={m.id}>{m.business_name}</option>
-          ))}
-        </select>
+      <div className="space-y-1.5">
+        <Label>Merchant</Label>
+        <Select value={merchantId} onValueChange={setMerchantId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select merchant" />
+          </SelectTrigger>
+          <SelectContent>
+            {merchants.map((m) => (
+              <SelectItem key={m.id} value={m.id}>{m.business_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Customer email</label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="correction-email">Customer email</Label>
+        <Input
+          id="correction-email"
           type="email"
           required
           value={customerEmail}
           onChange={(e) => setCustomerEmail(e.target.value)}
           placeholder="customer@example.com"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Point delta <span className="text-gray-400 font-normal">(positive = add, negative = deduct)</span>
-        </label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="correction-delta">
+          Point delta{' '}
+          <span className="text-muted-foreground font-normal">(positive = add, negative = deduct)</span>
+        </Label>
+        <Input
+          id="correction-delta"
           type="number"
           required
           value={delta}
           onChange={(e) => setDelta(e.target.value)}
           placeholder="e.g. 100 or -50"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Note <span className="text-red-500">*</span>
-        </label>
-        <textarea
+      <div className="space-y-1.5">
+        <Label htmlFor="correction-note">
+          Note <span className="text-destructive">*</span>
+        </Label>
+        <Textarea
+          id="correction-note"
           required
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Reason for correction..."
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black resize-none"
+          className="resize-none"
         />
       </div>
 
       {result && (
-        <p className={`text-sm ${result.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-sm ${result.ok ? 'text-green-600' : 'text-destructive'}`}>
           {result.message}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="px-6 py-2.5 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition"
-      >
+      <Button type="submit" disabled={loading}>
         {loading ? 'Applying...' : 'Apply correction'}
-      </button>
+      </Button>
     </form>
   )
 }

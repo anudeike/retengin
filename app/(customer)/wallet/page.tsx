@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { WalletCard } from '@/components/customer/WalletCard'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default async function WalletPage() {
   const supabase = await createServerClient()
@@ -10,7 +11,6 @@ export default async function WalletPage() {
 
   if (!user) redirect('/')
 
-  // Fetch customer record
   const { data: customer } = await supabase
     .from('customers')
     .select('id, display_name, email')
@@ -19,7 +19,6 @@ export default async function WalletPage() {
 
   if (!customer) redirect('/')
 
-  // Fetch all merchant balances for this customer (join merchants for names/slugs)
   const { data: balances } = await supabase
     .from('customer_merchant_balances')
     .select('balance, merchant_id, merchants(business_name, slug, logo_url)')
@@ -30,28 +29,27 @@ export default async function WalletPage() {
   const totalPoints = (balances ?? []).reduce((sum, b) => sum + b.balance, 0)
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-6">
-        {/* Header */}
         <div className="mb-8">
-          <p className="text-sm text-gray-500">Welcome back</p>
+          <p className="text-sm text-muted-foreground">Welcome back</p>
           <h1 className="text-2xl font-bold">{customer.display_name ?? customer.email}</h1>
         </div>
 
-        {/* Total points */}
-        <div className="bg-black text-white rounded-2xl p-6 mb-6">
-          <p className="text-sm opacity-70 mb-1">Total Taplo Points</p>
-          <p className="text-5xl font-bold">{totalPoints.toLocaleString()}</p>
-          <p className="text-xs opacity-50 mt-2">across {(balances ?? []).length} merchants</p>
-        </div>
+        <Card className="bg-foreground text-background mb-6">
+          <CardContent className="p-6">
+            <p className="text-sm opacity-70 mb-1">Total Taplo Points</p>
+            <p className="text-5xl font-bold">{totalPoints.toLocaleString()}</p>
+            <p className="text-xs opacity-50 mt-2">across {(balances ?? []).length} merchants</p>
+          </CardContent>
+        </Card>
 
-        {/* Per-merchant balances */}
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           Your Points
         </h2>
 
         {(balances ?? []).length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-muted-foreground">
             <p className="text-4xl mb-3">🎁</p>
             <p className="font-medium">No points yet</p>
             <p className="text-sm mt-1">Scan a merchant&apos;s QR code to start earning.</p>

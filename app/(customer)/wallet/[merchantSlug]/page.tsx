@@ -5,6 +5,8 @@ import { PointsHistory } from '@/components/customer/PointsHistory'
 import { RewardProgress } from '@/components/customer/RewardProgress'
 import { RealtimeWallet } from '@/components/customer/RealtimeWallet'
 import { RewardUnlockToast } from '@/components/customer/RewardUnlockToast'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   params: Promise<{ merchantSlug: string }>
@@ -19,7 +21,6 @@ export default async function MerchantWalletPage({ params }: Props) {
   } = await supabase.auth.getUser()
   if (!user) redirect('/')
 
-  // Fetch customer
   const { data: customer } = await supabase
     .from('customers')
     .select('id')
@@ -27,7 +28,6 @@ export default async function MerchantWalletPage({ params }: Props) {
     .maybeSingle()
   if (!customer) redirect('/')
 
-  // Fetch merchant
   const { data: merchant } = await supabase
     .from('merchants')
     .select('id, business_name, slug, logo_url')
@@ -36,7 +36,6 @@ export default async function MerchantWalletPage({ params }: Props) {
     .maybeSingle()
   if (!merchant) notFound()
 
-  // Fetch balance
   const { data: balanceRow } = await supabase
     .from('customer_merchant_balances')
     .select('balance')
@@ -46,7 +45,6 @@ export default async function MerchantWalletPage({ params }: Props) {
 
   const balance = balanceRow?.balance ?? 0
 
-  // Fetch last 20 transactions
   const { data: transactions } = await supabase
     .from('point_transactions')
     .select('id, transaction_type, points, balance_after, created_at, note')
@@ -55,7 +53,6 @@ export default async function MerchantWalletPage({ params }: Props) {
     .order('created_at', { ascending: false })
     .limit(20)
 
-  // Fetch active rewards
   const { data: rewards } = await supabase
     .from('rewards')
     .select('id, name, points_required')
@@ -64,24 +61,18 @@ export default async function MerchantWalletPage({ params }: Props) {
     .order('points_required', { ascending: true })
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Realtime subscription — triggers router.refresh() on new transactions */}
-      <RealtimeWallet customerId={customer.id} onPointsUpdate={() => {
-        // Handled by the router refresh in the client component
-      }} />
-      {/* Reward unlock toast */}
+    <main className="min-h-screen bg-background">
+      <RealtimeWallet customerId={customer.id} onPointsUpdate={() => {}} />
       <RewardUnlockToast
         previousBalance={Math.max(0, balance - 0)}
         currentBalance={balance}
         rewards={rewards ?? []}
       />
       <div className="max-w-lg mx-auto p-6">
-        {/* Back link */}
-        <Link href="/wallet" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
-          ← All merchants
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2">
+          <Link href="/wallet">← All merchants</Link>
+        </Button>
 
-        {/* Merchant header */}
         <div className="flex items-center gap-4 mb-6">
           {merchant.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -91,31 +82,29 @@ export default async function MerchantWalletPage({ params }: Props) {
               className="w-14 h-14 rounded-full object-cover"
             />
           ) : (
-            <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-400">
+            <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center text-2xl font-bold text-muted-foreground">
               {merchant.business_name.charAt(0)}
             </div>
           )}
           <div>
             <h1 className="text-xl font-bold">{merchant.business_name}</h1>
-            <p className="text-3xl font-bold">{balance.toLocaleString()} <span className="text-base font-normal text-gray-500">pts</span></p>
+            <p className="text-3xl font-bold">{balance.toLocaleString()} <span className="text-base font-normal text-muted-foreground">pts</span></p>
           </div>
         </div>
 
-        {/* Reward progress */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Rewards
-          </h2>
-          <RewardProgress currentBalance={balance} rewards={rewards ?? []} />
-        </section>
+        <Card className="mb-4">
+          <CardContent className="p-5">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Rewards</h2>
+            <RewardProgress currentBalance={balance} rewards={rewards ?? []} />
+          </CardContent>
+        </Card>
 
-        {/* Transaction history */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            History
-          </h2>
-          <PointsHistory transactions={transactions ?? []} />
-        </section>
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">History</h2>
+            <PointsHistory transactions={transactions ?? []} />
+          </CardContent>
+        </Card>
       </div>
     </main>
   )

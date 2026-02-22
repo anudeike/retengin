@@ -3,6 +3,10 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const schema = z.object({
   name: z.string().min(1).max(100),
@@ -46,53 +50,32 @@ export default async function NewRewardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-6">
-        <Link href="/dashboard/rewards" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
-          ← Rewards
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2">
+          <Link href="/dashboard/rewards">← Rewards</Link>
+        </Button>
         <h1 className="text-2xl font-bold mb-6">New Reward</h1>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <form action={createReward} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium mb-1">Reward name *</label>
-              <input
-                name="name"
-                required
-                maxLength={100}
-                placeholder="Free coffee"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
-              <input
-                name="description"
-                maxLength={300}
-                placeholder="One free drip coffee of any size"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Points required *</label>
-              <input
-                name="points_required"
-                type="number"
-                min={1}
-                required
-                placeholder="500"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition"
-            >
-              Create reward
-            </button>
-          </form>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <form action={createReward} className="space-y-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Reward name *</Label>
+                <Input id="name" name="name" required maxLength={100} placeholder="Free coffee" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="description">Description</Label>
+                <Input id="description" name="description" maxLength={300} placeholder="One free drip coffee of any size" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="points_required">Points required *</Label>
+                <Input id="points_required" name="points_required" type="number" min={1} required placeholder="500" />
+              </div>
+              <Button type="submit">Create reward</Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </main>
   )
