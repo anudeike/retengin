@@ -1,6 +1,17 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface Props {
   searchParams: Promise<{ q?: string }>
@@ -27,53 +38,47 @@ export default async function AdminCustomersPage({ searchParams }: Props) {
   const { data: customers } = await query
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto p-6">
-        <Link href="/admin" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
-          ← Admin
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-6">
+          <Link href="/admin">← Admin</Link>
+        </Button>
         <h1 className="text-2xl font-bold mb-6">Customers</h1>
 
-        {/* Search */}
         <form method="GET" className="mb-4">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search by email..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-          />
+          <Input name="q" defaultValue={q} placeholder="Search by email..." />
         </form>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Customer</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Joined</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {(customers ?? []).map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition">
-                  <td className="px-4 py-3">
+                <TableRow key={c.id}>
+                  <TableCell>
                     <Link href={`/admin/customers/${c.id}`} className="font-medium hover:underline">
                       {c.email}
                     </Link>
-                    {c.display_name && <p className="text-xs text-gray-400">{c.display_name}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
+                    {c.display_name && <p className="text-xs text-muted-foreground">{c.display_name}</p>}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {new Date(c.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {(customers ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={2} className="px-4 py-8 text-center text-gray-400">No customers found.</td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-muted-foreground py-8">No customers found.</TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     </main>
   )

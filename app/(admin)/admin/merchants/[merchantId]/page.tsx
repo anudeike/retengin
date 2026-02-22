@@ -4,6 +4,8 @@ import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { MerchantStatusBadge } from '@/components/admin/MerchantStatusBadge'
 import type { Enums } from '@/types/database.types'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   params: Promise<{ merchantId: string }>
@@ -49,63 +51,63 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto p-6">
-        <Link href="/admin/merchants" className="text-sm text-gray-500 hover:text-black mb-6 inline-block">
-          ← Merchants
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2">
+          <Link href="/admin/merchants">← Merchants</Link>
+        </Button>
 
         <div className="flex items-center gap-3 mb-6">
           <h1 className="text-2xl font-bold">{merchant.business_name}</h1>
           <MerchantStatusBadge status={merchant.status as Enums<'merchant_status'>} />
         </div>
 
-        {/* Info */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Details</h2>
-          <dl className="space-y-2 text-sm">
-            <div className="flex gap-2"><dt className="text-gray-500 w-32">Contact</dt><dd>{merchant.contact_email}</dd></div>
-            <div className="flex gap-2"><dt className="text-gray-500 w-32">Slug</dt><dd className="font-mono">{merchant.slug}</dd></div>
-            <div className="flex gap-2"><dt className="text-gray-500 w-32">Square ID</dt><dd>{merchant.square_merchant_id ?? '—'}</dd></div>
-            <div className="flex gap-2"><dt className="text-gray-500 w-32">Customers</dt><dd>{customerCount ?? 0}</dd></div>
-          </dl>
-        </section>
-
-        {/* Point rules */}
-        {rules && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Point Rules</h2>
+        <Card className="mb-4">
+          <CardContent className="p-5">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Details</h2>
             <dl className="space-y-2 text-sm">
-              <div className="flex gap-2"><dt className="text-gray-500 w-40">Points/dollar</dt><dd>{rules.points_per_dollar}</dd></div>
-              <div className="flex gap-2"><dt className="text-gray-500 w-40">Min spend</dt><dd>${(rules.min_spend_cents / 100).toFixed(2)}</dd></div>
-              <div className="flex gap-2"><dt className="text-gray-500 w-40">Min redemption</dt><dd>{rules.min_redemption_points} pts</dd></div>
-              <div className="flex gap-2"><dt className="text-gray-500 w-40">Active</dt><dd>{rules.is_active ? 'Yes' : 'No'}</dd></div>
+              <div className="flex gap-2"><dt className="text-muted-foreground w-32">Contact</dt><dd>{merchant.contact_email}</dd></div>
+              <div className="flex gap-2"><dt className="text-muted-foreground w-32">Slug</dt><dd className="font-mono">{merchant.slug}</dd></div>
+              <div className="flex gap-2"><dt className="text-muted-foreground w-32">Square ID</dt><dd>{merchant.square_merchant_id ?? '—'}</dd></div>
+              <div className="flex gap-2"><dt className="text-muted-foreground w-32">Customers</dt><dd>{customerCount ?? 0}</dd></div>
             </dl>
-          </section>
+          </CardContent>
+        </Card>
+
+        {rules && (
+          <Card className="mb-4">
+            <CardContent className="p-5">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Point Rules</h2>
+              <dl className="space-y-2 text-sm">
+                <div className="flex gap-2"><dt className="text-muted-foreground w-40">Points/dollar</dt><dd>{rules.points_per_dollar}</dd></div>
+                <div className="flex gap-2"><dt className="text-muted-foreground w-40">Min spend</dt><dd>${(rules.min_spend_cents / 100).toFixed(2)}</dd></div>
+                <div className="flex gap-2"><dt className="text-muted-foreground w-40">Min redemption</dt><dd>{rules.min_redemption_points} pts</dd></div>
+                <div className="flex gap-2"><dt className="text-muted-foreground w-40">Active</dt><dd>{rules.is_active ? 'Yes' : 'No'}</dd></div>
+              </dl>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Status toggle */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Change Status</h2>
-          <form action={setStatus} className="flex gap-3 flex-wrap">
-            {(['pending', 'active', 'suspended'] as const).map((s) => (
-              <button
-                key={s}
-                type="submit"
-                name="status"
-                value={s}
-                disabled={merchant.status === s}
-                className={`px-4 py-2 text-sm rounded-lg border transition ${
-                  merchant.status === s
-                    ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-default'
-                    : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Set {s}
-              </button>
-            ))}
-          </form>
-        </section>
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Change Status</h2>
+            <form action={setStatus} className="flex gap-3 flex-wrap">
+              {(['pending', 'active', 'suspended'] as const).map((s) => (
+                <Button
+                  key={s}
+                  type="submit"
+                  name="status"
+                  value={s}
+                  variant={merchant.status === s ? 'secondary' : 'outline'}
+                  disabled={merchant.status === s}
+                  size="sm"
+                >
+                  Set {s}
+                </Button>
+              ))}
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </main>
   )
