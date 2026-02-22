@@ -1,6 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface PointRuleFormProps {
   initialValues?: {
@@ -18,15 +22,9 @@ interface PointRuleFormProps {
 }
 
 export function PointRuleForm({ initialValues, onSave }: PointRuleFormProps) {
-  const [pointsPerDollar, setPointsPerDollar] = useState(
-    String(initialValues?.points_per_dollar ?? 1),
-  )
-  const [minSpendDollars, setMinSpendDollars] = useState(
-    String((initialValues?.min_spend_cents ?? 0) / 100),
-  )
-  const [minRedemption, setMinRedemption] = useState(
-    String(initialValues?.min_redemption_points ?? 100),
-  )
+  const [pointsPerDollar, setPointsPerDollar] = useState(String(initialValues?.points_per_dollar ?? 1))
+  const [minSpendDollars, setMinSpendDollars] = useState(String((initialValues?.min_spend_cents ?? 0) / 100))
+  const [minRedemption, setMinRedemption] = useState(String(initialValues?.min_redemption_points ?? 100))
   const [isActive, setIsActive] = useState(initialValues?.is_active ?? true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -37,15 +35,12 @@ export function PointRuleForm({ initialValues, onSave }: PointRuleFormProps) {
     setError('')
     setSaved(false)
     setSaving(true)
-
     const ppd = parseFloat(pointsPerDollar)
     const minCents = Math.round(parseFloat(minSpendDollars) * 100)
     const minPts = parseInt(minRedemption, 10)
-
     if (isNaN(ppd) || ppd <= 0) { setError('Points per dollar must be > 0'); setSaving(false); return }
     if (isNaN(minCents) || minCents < 0) { setError('Min spend must be ≥ $0'); setSaving(false); return }
     if (isNaN(minPts) || minPts < 0) { setError('Min redemption must be ≥ 0'); setSaving(false); return }
-
     try {
       await onSave({ points_per_dollar: ppd, min_spend_cents: minCents, min_redemption_points: minPts, is_active: isActive })
       setSaved(true)
@@ -58,64 +53,26 @@ export function PointRuleForm({ initialValues, onSave }: PointRuleFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium mb-1">Points per dollar spent</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={pointsPerDollar}
-          onChange={(e) => setPointsPerDollar(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-        />
-        <p className="text-xs text-gray-400 mt-1">e.g. 1 = 1 point per dollar</p>
+      <div className="space-y-1.5">
+        <Label htmlFor="ppd">Points per dollar spent</Label>
+        <Input id="ppd" type="number" step="0.01" min="0.01" value={pointsPerDollar} onChange={(e) => setPointsPerDollar(e.target.value)} />
+        <p className="text-xs text-muted-foreground">e.g. 1 = 1 point per dollar</p>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Minimum spend ($) to earn points</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={minSpendDollars}
-          onChange={(e) => setMinSpendDollars(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-        />
+      <div className="space-y-1.5">
+        <Label htmlFor="min-spend">Minimum spend ($) to earn points</Label>
+        <Input id="min-spend" type="number" step="0.01" min="0" value={minSpendDollars} onChange={(e) => setMinSpendDollars(e.target.value)} />
       </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Minimum points required to redeem</label>
-        <input
-          type="number"
-          step="1"
-          min="0"
-          value={minRedemption}
-          onChange={(e) => setMinRedemption(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
-        />
+      <div className="space-y-1.5">
+        <Label htmlFor="min-redemption">Minimum points required to redeem</Label>
+        <Input id="min-redemption" type="number" step="1" min="0" value={minRedemption} onChange={(e) => setMinRedemption(e.target.value)} />
       </div>
-
       <div className="flex items-center gap-3">
-        <input
-          type="checkbox"
-          id="is_active"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="w-4 h-4"
-        />
-        <label htmlFor="is_active" className="text-sm font-medium">Points program is active</label>
+        <Checkbox id="is-active" checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} />
+        <Label htmlFor="is-active">Points program is active</Label>
       </div>
-
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-destructive text-sm">{error}</p>}
       {saved && <p className="text-green-600 text-sm">Saved successfully!</p>}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="px-6 py-2.5 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition"
-      >
-        {saving ? 'Saving...' : 'Save rules'}
-      </button>
+      <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save rules'}</Button>
     </form>
   )
 }

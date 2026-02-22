@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface QRCodeDisplayProps {
   slug: string
@@ -14,7 +15,6 @@ export function QRCodeDisplay({ slug, appUrl, size = 200 }: QRCodeDisplayProps) 
 
   useEffect(() => {
     if (!canvasRef.current) return
-
     import('qrcode').then((QRCode) => {
       QRCode.toCanvas(canvasRef.current!, joinUrl, { width: size, margin: 2 })
     })
@@ -22,8 +22,12 @@ export function QRCodeDisplay({ slug, appUrl, size = 200 }: QRCodeDisplayProps) 
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <canvas ref={canvasRef} className="rounded-lg border border-gray-200" />
-      <p className="text-xs text-gray-500 break-all max-w-xs text-center">{joinUrl}</p>
+      <Card>
+        <CardContent className="p-3">
+          <canvas ref={canvasRef} className="rounded" />
+        </CardContent>
+      </Card>
+      <p className="text-xs text-muted-foreground break-all max-w-xs text-center">{joinUrl}</p>
     </div>
   )
 }
