@@ -1,6 +1,7 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   children: ReactNode
@@ -30,17 +31,18 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         this.props.fallback ?? (
-          <div className="p-6 text-center text-gray-500">
+          <div className="p-6 text-center text-muted-foreground">
             <p className="text-2xl mb-2">⚠️</p>
             <p className="font-medium">Something went wrong.</p>
             <p className="text-sm mt-1">{this.state.error?.message}</p>
-            <button
-              type="button"
+            <Button
+              variant="link"
+              size="sm"
+              className="mt-4"
               onClick={() => this.setState({ hasError: false })}
-              className="mt-4 text-sm underline hover:no-underline"
             >
               Try again
-            </button>
+            </Button>
           </div>
         )
       )

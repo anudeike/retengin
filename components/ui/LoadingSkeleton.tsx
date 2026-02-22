@@ -1,9 +1,11 @@
+import { Skeleton as ShadcnSkeleton } from '@/components/ui/skeleton'
+
 interface SkeletonProps {
   className?: string
 }
 
 export function Skeleton({ className = '' }: SkeletonProps) {
-  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  return <ShadcnSkeleton className={className} />
 }
 
 export function WalletPageSkeleton() {
