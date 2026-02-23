@@ -14,7 +14,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-export default async function AdminMerchantsPage() {
+export default async function AdminMerchantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invited?: string }>
+}) {
+  const { invited } = await searchParams
   const supabase = await createServerClient()
   const {
     data: { user },
@@ -47,7 +52,7 @@ export default async function AdminMerchantsPage() {
     )
     if (unconfirmed) await service.auth.admin.deleteUser(unconfirmed.id)
     await service.auth.admin.inviteUserByEmail(merchant.contact_email, { redirectTo })
-    redirect('/admin/merchants')
+    redirect('/admin/merchants?invited=1')
   }
 
   return (
@@ -62,6 +67,12 @@ export default async function AdminMerchantsPage() {
             <Link href="/admin/merchants/new">+ Onboard</Link>
           </Button>
         </div>
+
+        {invited && (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            Invite sent — the merchant will receive an email shortly.
+          </div>
+        )}
 
         <Card>
           <Table>

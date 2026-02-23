@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button'
 
 interface Props {
   params: Promise<{ merchantId: string }>
+  searchParams: Promise<{ invited?: string }>
 }
 
-export default async function AdminMerchantDetailPage({ params }: Props) {
+export default async function AdminMerchantDetailPage({ params, searchParams }: Props) {
   const { merchantId } = await params
+  const { invited } = await searchParams
   const supabase = await createServerClient()
   const {
     data: { user },
@@ -70,7 +72,7 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
     )
     if (unconfirmed) await service.auth.admin.deleteUser(unconfirmed.id)
     await service.auth.admin.inviteUserByEmail(merchant.contact_email, { redirectTo })
-    redirect(`/admin/merchants/${merchantId}`)
+    redirect(`/admin/merchants/${merchantId}?invited=1`)
   }
 
   return (
@@ -103,9 +105,15 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Invite
               </h2>
-              <p className="text-sm text-muted-foreground mb-3">
-                This merchant hasn&apos;t claimed their account yet.
-              </p>
+              {invited ? (
+                <p className="text-sm text-green-700 mb-3">
+                  Invite sent — the merchant will receive an email shortly.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-3">
+                  This merchant hasn&apos;t claimed their account yet.
+                </p>
+              )}
               <form action={resendInvite}>
                 <Button type="submit" variant="outline" size="sm">Resend invite</Button>
               </form>
