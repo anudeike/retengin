@@ -56,13 +56,12 @@ export default async function NewMerchantPage() {
       is_active: true,
     })
 
-    await service.auth.admin.generateLink({
-      type: 'magiclink',
-      email: parsed.data.contact_email.toLowerCase(),
-      options: {
+    await service.auth.admin.inviteUserByEmail(
+      parsed.data.contact_email.toLowerCase(),
+      {
         redirectTo: `${appUrl}/api/auth/callback?role=merchant`,
       },
-    })
+    )
 
     redirect('/admin/merchants')
   }
