@@ -60,9 +60,16 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
       .single()
     if (!merchant || merchant.auth_user_id) return
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taplo.app'
-    await service.auth.admin.inviteUserByEmail(merchant.contact_email, {
-      redirectTo: `${appUrl}/api/auth/callback?role=merchant`,
-    })
+    const redirectTo = `${appUrl}/api/auth/callback?role=merchant`
+    // Delete any existing unconfirmed auth user for this email so the re-invite
+    // always lands on a clean slate (inviteUserByEmail errors if the user already
+    // exists in auth.users, even when they haven't confirmed yet).
+    const { data: authData } = await service.auth.admin.listUsers({ perPage: 1000 })
+    const unconfirmed = authData?.users?.find(
+      u => u.email?.toLowerCase() === merchant.contact_email.toLowerCase() && !u.email_confirmed_at
+    )
+    if (unconfirmed) await service.auth.admin.deleteUser(unconfirmed.id)
+    await service.auth.admin.inviteUserByEmail(merchant.contact_email, { redirectTo })
     redirect(`/admin/merchants/${merchantId}`)
   }
 
