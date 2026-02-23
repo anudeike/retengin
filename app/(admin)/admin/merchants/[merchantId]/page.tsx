@@ -50,6 +50,22 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
     redirect(`/admin/merchants/${merchantId}`)
   }
 
+  async function resendInvite() {
+    'use server'
+    const service = createServiceRoleClient()
+    const { data: merchant } = await service
+      .from('merchants')
+      .select('contact_email, auth_user_id')
+      .eq('id', merchantId)
+      .single()
+    if (!merchant || merchant.auth_user_id) return
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taplo.app'
+    await service.auth.admin.inviteUserByEmail(merchant.contact_email, {
+      redirectTo: `${appUrl}/api/auth/callback?role=merchant`,
+    })
+    redirect(`/admin/merchants/${merchantId}`)
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto p-6">
@@ -73,6 +89,22 @@ export default async function AdminMerchantDetailPage({ params }: Props) {
             </dl>
           </CardContent>
         </Card>
+
+        {!merchant.auth_user_id && (
+          <Card className="mb-4">
+            <CardContent className="p-5">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Invite
+              </h2>
+              <p className="text-sm text-muted-foreground mb-3">
+                This merchant hasn&apos;t claimed their account yet.
+              </p>
+              <form action={resendInvite}>
+                <Button type="submit" variant="outline" size="sm">Resend invite</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {rules && (
           <Card className="mb-4">
