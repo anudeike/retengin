@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { MerchantStatusBadge } from '@/components/admin/MerchantStatusBadge'
 import type { Enums } from '@/types/database.types'
 import { Card } from '@/components/ui/card'
@@ -23,8 +23,25 @@ export default async function AdminMerchantsPage() {
 
   const { data: merchants } = await supabase
     .from('merchants')
-    .select('id, business_name, slug, status, contact_email, square_merchant_id, created_at')
+    .select('id, business_name, slug, status, contact_email, square_merchant_id, auth_user_id, created_at')
     .order('created_at', { ascending: false })
+
+  async function resendInvite(formData: FormData) {
+    'use server'
+    const merchantId = formData.get('merchantId') as string
+    const service = createServiceRoleClient()
+    const { data: merchant } = await service
+      .from('merchants')
+      .select('contact_email, auth_user_id')
+      .eq('id', merchantId)
+      .single()
+    if (!merchant || merchant.auth_user_id) return
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taplo.app'
+    await service.auth.admin.inviteUserByEmail(merchant.contact_email, {
+      redirectTo: `${appUrl}/api/auth/callback?role=merchant`,
+    })
+    redirect('/admin/merchants')
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -56,6 +73,14 @@ export default async function AdminMerchantsPage() {
                       {m.business_name}
                     </Link>
                     <p className="text-xs text-muted-foreground">{m.contact_email}</p>
+                    {!m.auth_user_id && (
+                      <form action={resendInvite}>
+                        <input type="hidden" name="merchantId" value={m.id} />
+                        <button type="submit" className="text-xs text-blue-500 hover:underline mt-0.5">
+                          Resend invite
+                        </button>
+                      </form>
+                    )}
                   </TableCell>
                   <TableCell>
                     <MerchantStatusBadge status={m.status as Enums<'merchant_status'>} />
