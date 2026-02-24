@@ -36,7 +36,14 @@ export default async function NewMerchantPage() {
     const service = createServiceRoleClient()
     const headersList = await headers()
     const host = headersList.get('host') ?? 'localhost:3000'
-    const proto = headersList.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
+    const proto = (headersList.get('x-forwarded-proto') ?? '').split(',')[0].trim()
+      || (host.startsWith('localhost') ? 'http' : 'https')
+    const configuredHost = process.env.NEXT_PUBLIC_APP_URL
+      ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
+      : null
+    if (configuredHost && host !== configuredHost && !host.startsWith('localhost')) {
+      throw new Error(`Unexpected host header: ${host}`)
+    }
     const appUrl = `${proto}://${host}`
 
     const { data: merchant, error } = await service
