@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import Link from 'next/link'
+import { getAppUrl } from '@/lib/utils/request-url'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { MerchantStatusBadge } from '@/components/admin/MerchantStatusBadge'
 import type { Enums } from '@/types/database.types'
@@ -42,17 +42,7 @@ export default async function AdminMerchantsPage({
       .eq('id', merchantId)
       .single()
     if (!merchant || merchant.auth_user_id) return
-    const headersList = await headers()
-    const host = headersList.get('host') ?? 'localhost:3000'
-    const proto = (headersList.get('x-forwarded-proto') ?? '').split(',')[0].trim()
-      || (host.startsWith('localhost') ? 'http' : 'https')
-    const configuredHost = process.env.NEXT_PUBLIC_APP_URL
-      ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
-      : null
-    if (configuredHost && host !== configuredHost && !host.startsWith('localhost')) {
-      throw new Error(`Unexpected host header: ${host}`)
-    }
-    const appUrl = `${proto}://${host}`
+    const appUrl = await getAppUrl()
     const redirectTo = `${appUrl}/api/auth/callback?role=merchant`
     // Delete any existing unconfirmed auth user for this email so the re-invite
     // always lands on a clean slate (inviteUserByEmail errors if the user already

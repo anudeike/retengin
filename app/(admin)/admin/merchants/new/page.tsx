@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { headers } from 'next/headers'
+import { getAppUrl } from '@/lib/utils/request-url'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { generateSlug } from '@/lib/utils/slug'
@@ -34,17 +34,7 @@ export default async function NewMerchantPage() {
     if (!parsed.success) return
 
     const service = createServiceRoleClient()
-    const headersList = await headers()
-    const host = headersList.get('host') ?? 'localhost:3000'
-    const proto = (headersList.get('x-forwarded-proto') ?? '').split(',')[0].trim()
-      || (host.startsWith('localhost') ? 'http' : 'https')
-    const configuredHost = process.env.NEXT_PUBLIC_APP_URL
-      ? new URL(process.env.NEXT_PUBLIC_APP_URL).host
-      : null
-    if (configuredHost && host !== configuredHost && !host.startsWith('localhost')) {
-      throw new Error(`Unexpected host header: ${host}`)
-    }
-    const appUrl = `${proto}://${host}`
+    const appUrl = await getAppUrl()
 
     const { data: merchant, error } = await service
       .from('merchants')
