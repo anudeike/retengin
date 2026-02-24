@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { generateSlug } from '@/lib/utils/slug'
@@ -33,7 +34,10 @@ export default async function NewMerchantPage() {
     if (!parsed.success) return
 
     const service = createServiceRoleClient()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taplo.app'
+    const headersList = await headers()
+    const host = headersList.get('host') ?? 'localhost:3000'
+    const proto = headersList.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
+    const appUrl = `${proto}://${host}`
 
     const { data: merchant, error } = await service
       .from('merchants')
