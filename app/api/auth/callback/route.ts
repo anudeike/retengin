@@ -14,9 +14,11 @@ const ROLE_DESTINATIONS: Record<AppRole, string> = {
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const tokenHash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
   const roleParam = (searchParams.get('role') ?? 'customer') as AppRole
 
-  if (!code) {
+  if (!code && !tokenHash) {
     return NextResponse.redirect(new URL('/?error=missing_code', origin))
   }
 
@@ -43,13 +45,14 @@ export async function GET(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.exchangeCodeForSession(code)
+  // token_hash flow: used by PKCE magic links and invites (token sent directly in email link)
+  // code flow: used by PKCE OAuth and older redirect-based flows
+  const { data: { user }, error } = tokenHash && type
+    ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as Parameters<typeof supabase.auth.verifyOtp>[0]['type'] })
+    : await supabase.auth.exchangeCodeForSession(code!)
 
   if (error || !user) {
-    console.error('[auth/callback] exchangeCodeForSession error:', error)
+    console.error('[auth/callback] auth error:', error)
     return NextResponse.redirect(new URL('/?error=auth_failed', origin))
   }
 
