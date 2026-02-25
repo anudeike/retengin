@@ -48,10 +48,14 @@ export default async function AdminMerchantsPage({
     // always lands on a clean slate (inviteUserByEmail errors if the user already
     // exists in auth.users, even when they haven't confirmed yet).
     const { data: authData } = await service.auth.admin.listUsers({ perPage: 1000 })
-    const unconfirmed = authData?.users?.find(
-      u => u.email?.toLowerCase() === merchant.contact_email.toLowerCase() && !u.email_confirmed_at
+    // Delete any existing auth user for this email, confirmed or not.
+    // A confirmed-but-unlinked user means the merchant clicked a previous invite
+    // but our callback failed (e.g. implicit flow mismatch). Since auth_user_id is
+    // still null on the merchant record, it's safe to delete and start fresh.
+    const existingAuthUser = authData?.users?.find(
+      u => u.email?.toLowerCase() === merchant.contact_email.toLowerCase()
     )
-    if (unconfirmed) await service.auth.admin.deleteUser(unconfirmed.id)
+    if (existingAuthUser) await service.auth.admin.deleteUser(existingAuthUser.id)
     await service.auth.admin.inviteUserByEmail(merchant.contact_email, { redirectTo })
     redirect('/admin/merchants?invited=1')
   }
