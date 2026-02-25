@@ -57,12 +57,13 @@ export default async function NewMerchantPage() {
       is_active: true,
     })
 
-    await service.auth.admin.inviteUserByEmail(
+    const { error: inviteError } = await service.auth.admin.inviteUserByEmail(
       parsed.data.contact_email.toLowerCase(),
       {
         redirectTo: `${appUrl}/api/auth/callback?role=merchant`,
       },
     )
+    if (inviteError) throw inviteError
 
     redirect('/admin/merchants')
   }
