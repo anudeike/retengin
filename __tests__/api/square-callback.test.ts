@@ -114,10 +114,10 @@ describe('GET /api/square/callback', () => {
     )
   })
 
-  it('redirects to /dashboard/connect?success=true on success', async () => {
+  it('redirects to /dashboard/connect/done on success', async () => {
     const res = await GET(makeRequest('?code=some-code&state=valid-state-123'))
     expect(res.status).toBe(307)
-    expect(res.headers.get('location')).toContain('/dashboard/connect?success=true')
+    expect(res.headers.get('location')).toContain('/dashboard/connect/done')
   })
 
   it('redirects to connect?error=token_exchange_failed when token exchange throws', async () => {
