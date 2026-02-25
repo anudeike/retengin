@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ConnectSquareButton } from './ConnectSquareButton'
 
 interface Props {
   searchParams: Promise<{ success?: string; error?: string }>
@@ -62,9 +63,7 @@ export default async function SquareConnectPage({ searchParams }: Props) {
                   <p className="text-sm text-muted-foreground mb-3">
                     Need to reconnect? Re-authorize below to refresh your tokens.
                   </p>
-                  <Button variant="outline" asChild>
-                    <Link href="/api/square/connect">Reconnect Square</Link>
-                  </Button>
+                  <ConnectSquareButton isConnected={true} />
                 </div>
               </div>
             ) : (
@@ -77,9 +76,7 @@ export default async function SquareConnectPage({ searchParams }: Props) {
                   Connect your Square account so Taplo can automatically award points when customers
                   make purchases.
                 </p>
-                <Button asChild size="lg">
-                  <Link href="/api/square/connect">Connect Square Account</Link>
-                </Button>
+                <ConnectSquareButton isConnected={false} />
               </div>
             )}
           </CardContent>
