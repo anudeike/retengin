@@ -79,7 +79,8 @@ export async function GET(request: Request) {
       })
       .eq('auth_user_id', user.id)
 
-    return NextResponse.redirect(`${origin}/dashboard/connect?success=true`)
+    // /dashboard/connect/done is a client page that posts postMessage to the opener tab and closes itself
+    return NextResponse.redirect(`${origin}/dashboard/connect/done`)
   } catch (err) {
     console.error('[square/callback] error:', err)
     return NextResponse.redirect(`${origin}/dashboard/connect?error=token_exchange_failed`)
