@@ -25,6 +25,10 @@ export function ConnectSquareButton({ isConnected }: Props) {
   }, [router])
 
   function handleClick() {
+    // NOTE: Do not add 'noopener' here. The done page (/dashboard/connect/done)
+    // relies on window.opener to postMessage back to this tab. Adding 'noopener'
+    // would set window.opener to null there, breaking the auto-close flow and
+    // falling back to a full-page redirect instead.
     window.open('/api/square/connect', '_blank')
   }
 
