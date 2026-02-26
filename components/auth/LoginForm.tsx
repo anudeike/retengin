@@ -9,9 +9,10 @@ interface LoginFormProps {
   title: string
   description: string
   onSubmit: (email: string) => Promise<{ error?: string }>
+  footer?: React.ReactNode
 }
 
-export function LoginForm({ title, description, onSubmit }: LoginFormProps) {
+export function LoginForm({ title, description, onSubmit, footer }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -73,6 +74,7 @@ export function LoginForm({ title, description, onSubmit }: LoginFormProps) {
             {loading ? 'Sending\u2026' : 'Send magic link'}
           </Button>
         </form>
+        {footer && <div className="text-center text-sm text-muted-foreground">{footer}</div>}
       </div>
     </main>
   )
