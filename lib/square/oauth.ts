@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 const SQUARE_SCOPES = [
   'MERCHANT_PROFILE_READ',
   'PAYMENTS_READ',
-].join('+')
+].join(' ')
 
 /**
  * Builds the Square OAuth authorization URL and returns both the URL
