@@ -21,13 +21,18 @@ export function LoginForm({ title, description, onSubmit }: LoginFormProps) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const result = await onSubmit(email.toLowerCase().trim())
-    setLoading(false)
-    if (result?.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await onSubmit(email.toLowerCase().trim())
+      if (result?.error) {
+        setError(result.error)
+        return
+      }
+      setSubmitted(true)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setSubmitted(true)
   }
 
   if (submitted) {

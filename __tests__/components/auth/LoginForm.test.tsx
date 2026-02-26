@@ -32,6 +32,8 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: /send magic link/i }))
     expect(await screen.findByRole('button', { name: /sending/i })).toBeDisabled()
     resolveOtp({})
+    // wait for the submit cycle to fully complete before the test ends
+    expect(await screen.findByRole('heading', { name: /check your email/i })).toBeInTheDocument()
   })
 
   it('shows the "Check your email" screen after a successful submission', async () => {
