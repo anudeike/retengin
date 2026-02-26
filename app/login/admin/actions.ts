@@ -32,12 +32,16 @@ export async function sendAdminMagicLink(email: string): Promise<{ error?: strin
   }
 
   // Step 2: Confirm the user has the admin role in our user_roles table.
-  const { data: roleRecord } = await adminSupabase
+  const { data: roleRecord, error: roleError } = await adminSupabase
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
     .eq('role', 'admin')
     .maybeSingle()
+
+  if (roleError) {
+    return { error: 'Unable to verify admin status. Please try again.' }
+  }
 
   if (!roleRecord) {
     return { error: "This email isn't registered as an admin account." }

@@ -64,6 +64,21 @@ describe('sendAdminMagicLink', () => {
     expect(mockSignInWithOtp).not.toHaveBeenCalled()
   })
 
+  it('returns error when the user_roles DB query fails', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ users: [{ id: 'user-123' }] }),
+    })
+    const chain = makeQueryChain({ data: null, error: null })
+    chain.maybeSingle.mockResolvedValue({ data: null, error: { message: 'DB timeout' } })
+    mockFrom.mockReturnValue(chain)
+
+    const result = await sendAdminMagicLink('user@example.com')
+
+    expect(result).toEqual({ error: 'Unable to verify admin status. Please try again.' })
+    expect(mockSignInWithOtp).not.toHaveBeenCalled()
+  })
+
   it('sends OTP and returns success for a known admin email', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
