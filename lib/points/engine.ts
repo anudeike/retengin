@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from '@/lib/supabase/server'
+import { awardReferralBonus } from '@/lib/referrals/bonus'
 
 // Square payment type (simplified subset of the full SDK type)
 interface SquarePayment {
@@ -99,6 +100,28 @@ export async function handlePaymentCompleted(
       return
     }
     console.error('[engine] award_points error:', error)
+  }
+
+  // Check for an open referral (status=wallet_created) for this customer at this merchant.
+  // Only fires on first earned transaction — the referral status change to 'completed'
+  // prevents it from firing again.
+  const { data: openReferral } = await supabase
+    .from('referrals')
+    .select('id, referrer_id')
+    .eq('referee_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'wallet_created')
+    .maybeSingle()
+
+  if (openReferral) {
+    await awardReferralBonus(
+      openReferral.id,
+      openReferral.referrer_id,
+      customer.id,
+      merchant.id,
+      amountCents,
+      supabase,
+    )
   }
 }
 

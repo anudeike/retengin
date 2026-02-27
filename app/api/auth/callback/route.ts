@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get('token_hash')
   const type = searchParams.get('type')
   const roleParam = (searchParams.get('role') ?? 'customer') as AppRole
+  const refCode = searchParams.get('ref')
+  const merchantSlug = searchParams.get('slug')
 
   if (!code && !tokenHash) {
     return NextResponse.redirect(new URL('/?error=missing_code', origin))
@@ -91,6 +93,40 @@ export async function GET(request: NextRequest) {
         await adminSupabase
           .from('customers')
           .insert({ email, auth_user_id: user.id })
+      }
+
+      // Handle referral if the new customer arrived via a referral link
+      if (refCode && merchantSlug) {
+        const { data: customerRecord } = await adminSupabase
+          .from('customers')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle()
+
+        const [{ data: referrer }, { data: merchantRecord }] = await Promise.all([
+          adminSupabase
+            .from('customers')
+            .select('id, email')
+            .eq('referral_code', refCode)
+            .maybeSingle(),
+          adminSupabase
+            .from('merchants')
+            .select('id')
+            .eq('slug', merchantSlug)
+            .maybeSingle(),
+        ])
+
+        if (customerRecord && referrer && merchantRecord) {
+          const isSelfReferral = referrer.email.toLowerCase() === email
+          // Unique constraint on (referee_email, merchant_id) silently handles duplicates
+          await adminSupabase.from('referrals').insert({
+            referrer_id: referrer.id,
+            referee_id: customerRecord.id,
+            merchant_id: merchantRecord.id,
+            referee_email: email,
+            status: isSelfReferral ? 'invalid' : 'wallet_created',
+          })
+        }
       }
     }
 
