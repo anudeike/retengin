@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { WalletCard } from '@/components/customer/WalletCard'
+import { ClosestRewards } from '@/components/customer/ClosestRewards'
 import { Card, CardContent } from '@/components/ui/card'
 
 export default async function WalletPage() {
@@ -28,6 +29,44 @@ export default async function WalletPage() {
 
   const totalPoints = (balances ?? []).reduce((sum, b) => sum + b.balance, 0)
 
+  // "Closest to Unlocking" — cross-merchant rewards sorted by proximity
+  // Only considers merchants where the customer has a balance > 0
+  const merchantIds = (balances ?? []).map((b) => b.merchant_id)
+  let closestRewards: Array<{
+    rewardId: string
+    rewardName: string
+    pointsRequired: number
+    currentBalance: number
+    merchantName: string
+    merchantSlug: string
+  }> = []
+
+  if (merchantIds.length > 0) {
+    const { data: rewardRows } = await supabase
+      .from('rewards')
+      .select('id, name, points_required, merchant_id, merchants(business_name, slug)')
+      .in('merchant_id', merchantIds)
+      .eq('is_active', true)
+
+    closestRewards = (rewardRows ?? [])
+      .map((r) => {
+        const balance = (balances ?? []).find((b) => b.merchant_id === r.merchant_id)?.balance ?? 0
+        const m = r.merchants as unknown as { business_name: string; slug: string } | null
+        if (!m || balance >= r.points_required) return null
+        return {
+          rewardId: r.id,
+          rewardName: r.name,
+          pointsRequired: r.points_required,
+          currentBalance: balance,
+          merchantName: m.business_name,
+          merchantSlug: m.slug,
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => (a.pointsRequired - a.currentBalance) - (b.pointsRequired - b.currentBalance))
+      .slice(0, 5)
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-6">
@@ -43,6 +82,17 @@ export default async function WalletPage() {
             <p className="text-xs opacity-50 mt-2">across {(balances ?? []).length} merchants</p>
           </CardContent>
         </Card>
+
+        {closestRewards.length > 0 && (
+          <>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Closest to Unlocking
+            </h2>
+            <div className="mb-6">
+              <ClosestRewards items={closestRewards} />
+            </div>
+          </>
+        )}
 
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           Your Points

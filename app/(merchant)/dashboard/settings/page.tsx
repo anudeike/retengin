@@ -31,6 +31,7 @@ export default async function MerchantSettingsPage() {
     min_spend_cents: number
     min_redemption_points: number
     is_active: boolean
+    messaging_style: 'points_away' | 'spend_more'
   }) {
     'use server'
     const service = createServiceRoleClient()
@@ -65,7 +66,10 @@ export default async function MerchantSettingsPage() {
           <CardContent className="p-6">
             <h2 className="text-base font-semibold mb-4">Point rules</h2>
             <PointRuleForm
-              initialValues={rules ?? undefined}
+              initialValues={rules ? {
+                ...rules,
+                messaging_style: (rules.messaging_style as 'points_away' | 'spend_more') ?? 'points_away',
+              } : undefined}
               onSave={saveRules}
             />
           </CardContent>
