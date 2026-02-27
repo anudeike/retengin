@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { sendTransactionalEmail } from '@/lib/email/send'
+import { unsubscribeUrl } from '@/lib/email/unsubscribe-token'
+import { render } from '@react-email/render'
+import { RewardRedeemed } from '@/lib/email/templates/RewardRedeemed'
+import React from 'react'
 
 const schema = z.object({
   customerId: z.string().uuid(),
@@ -56,6 +61,51 @@ export async function POST(request: Request) {
     console.error('[redeem] RPC error:', error)
     return NextResponse.json({ error: 'Redemption failed' }, { status: 500 })
   }
+
+  // Fire RewardRedeemed email (fire-and-forget)
+  void (async () => {
+    const [customerRes, merchantRes, rewardRes, balanceRes] = await Promise.all([
+      serviceClient.from('customers').select('email, display_name').eq('id', customerId).single(),
+      serviceClient.from('merchants').select('business_name, logo_url, slug').eq('id', merchantId).single(),
+      serviceClient.from('rewards').select('name').eq('id', rewardId).single(),
+      serviceClient
+        .from('customer_merchant_balances')
+        .select('balance')
+        .eq('customer_id', customerId)
+        .eq('merchant_id', merchantId)
+        .maybeSingle(),
+    ])
+
+    const customer = customerRes.data
+    const merchantInfo = merchantRes.data
+    const reward = rewardRes.data
+    if (!customer || !merchantInfo || !reward) return
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+    const walletUrl = `${appUrl}/wallet/${merchantInfo.slug ?? ''}`
+    const unsub = unsubscribeUrl(customerId, merchantId)
+    const remainingBalance = balanceRes.data?.balance ?? 0
+
+    const html = await render(
+      React.createElement(RewardRedeemed, {
+        customerName: customer.display_name ?? customer.email,
+        merchantName: merchantInfo.business_name,
+        merchantLogoUrl: merchantInfo.logo_url,
+        rewardName: reward.name,
+        pointsSpent: points,
+        remainingBalance,
+        walletUrl,
+        unsubscribeUrl: unsub,
+      }),
+    )
+    await sendTransactionalEmail({
+      to: customer.email,
+      subject: `Reward redeemed at ${merchantInfo.business_name}: ${reward.name}`,
+      html,
+      customerId,
+      merchantId,
+    })
+  })()
 
   return NextResponse.json({ redemptionId })
 }

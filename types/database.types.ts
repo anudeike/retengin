@@ -78,12 +78,46 @@ export type Database = {
           },
         ]
       }
+      customer_merchant_email_prefs: {
+        Row: {
+          customer_id: string
+          merchant_id: string
+          opted_out: boolean
+        }
+        Insert: {
+          customer_id: string
+          merchant_id: string
+          opted_out?: boolean
+        }
+        Update: {
+          customer_id?: string
+          merchant_id?: string
+          opted_out?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_merchant_email_prefs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_merchant_email_prefs_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           auth_user_id: string | null
           created_at: string
           display_name: string | null
           email: string
+          email_global_opt_out: boolean
           id: string
           referral_code: string | null
           taplo_points: number
@@ -94,6 +128,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email: string
+          email_global_opt_out?: boolean
           id?: string
           referral_code?: string | null
           taplo_points?: number
@@ -104,6 +139,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           email?: string
+          email_global_opt_out?: boolean
           id?: string
           referral_code?: string | null
           taplo_points?: number
@@ -161,6 +197,7 @@ export type Database = {
           business_name: string
           contact_email: string
           created_at: string
+          emails_enabled: boolean
           id: string
           logo_url: string | null
           slug: string
@@ -177,6 +214,7 @@ export type Database = {
           business_name: string
           contact_email: string
           created_at?: string
+          emails_enabled?: boolean
           id?: string
           logo_url?: string | null
           slug: string
@@ -193,6 +231,7 @@ export type Database = {
           business_name?: string
           contact_email?: string
           created_at?: string
+          emails_enabled?: boolean
           id?: string
           logo_url?: string | null
           slug?: string
