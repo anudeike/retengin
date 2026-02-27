@@ -60,6 +60,24 @@ export default async function MerchantWalletPage({ params }: Props) {
     .eq('is_active', true)
     .order('points_required', { ascending: true })
 
+  const { data: rules } = await supabase
+    .from('merchant_point_rules')
+    .select('messaging_style, points_per_dollar')
+    .eq('merchant_id', merchant.id)
+    .maybeSingle()
+
+  const { data: redemptionRows } = await supabase
+    .from('reward_redemptions')
+    .select('reward_id')
+    .eq('customer_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'approved')
+
+  const redemptions: Record<string, number> = {}
+  for (const row of redemptionRows ?? []) {
+    redemptions[row.reward_id] = (redemptions[row.reward_id] ?? 0) + 1
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <RealtimeWallet customerId={customer.id} onPointsUpdate={() => {}} />
@@ -95,7 +113,13 @@ export default async function MerchantWalletPage({ params }: Props) {
         <Card className="mb-4">
           <CardContent className="p-5">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Rewards</h2>
-            <RewardProgress currentBalance={balance} rewards={rewards ?? []} />
+            <RewardProgress
+              currentBalance={balance}
+              rewards={rewards ?? []}
+              redemptions={redemptions}
+              messagingStyle={(rules?.messaging_style as 'points_away' | 'spend_more') ?? 'points_away'}
+              pointsPerDollar={Number(rules?.points_per_dollar ?? 1)}
+            />
           </CardContent>
         </Card>
 
