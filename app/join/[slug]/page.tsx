@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label'
 
 interface JoinPageProps {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ ref?: string }>
 }
 
-export default function JoinPage({ params }: JoinPageProps) {
+export default function JoinPage({ params, searchParams }: JoinPageProps) {
   const [slug, setSlug] = useState<string | null>(null)
+  const [refCode, setRefCode] = useState<string | null>(null)
   const [merchant, setMerchant] = useState<{
     id: string
     business_name: string
@@ -25,8 +27,9 @@ export default function JoinPage({ params }: JoinPageProps) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    params.then(({ slug: s }) => {
+    Promise.all([params, searchParams]).then(([{ slug: s }, { ref }]) => {
       setSlug(s)
+      setRefCode(ref ?? null)
       const supabase = createClient()
       supabase
         .from('merchants')
@@ -36,7 +39,7 @@ export default function JoinPage({ params }: JoinPageProps) {
         .maybeSingle()
         .then(({ data }) => setMerchant(data))
     })
-  }, [params])
+  }, [params, searchParams])
 
   if (merchant === undefined) {
     return (
@@ -54,9 +57,12 @@ export default function JoinPage({ params }: JoinPageProps) {
     setLoading(true)
     const supabase = createClient()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
+    const callbackParams = new URLSearchParams({ role: 'customer' })
+    if (refCode) callbackParams.set('ref', refCode)
+    if (slug) callbackParams.set('slug', slug)
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${appUrl}/api/auth/callback?role=customer` },
+      options: { emailRedirectTo: `${appUrl}/api/auth/callback?${callbackParams}` },
     })
     setLoading(false)
     if (otpError) { setError(otpError.message); return }
@@ -89,6 +95,11 @@ export default function JoinPage({ params }: JoinPageProps) {
               height={80}
               className="mx-auto mb-4 rounded-full object-cover"
             />
+          )}
+          {refCode && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+              You were invited by a friend! Sign up to earn bonus points on your first purchase.
+            </div>
           )}
           <p className="text-sm text-muted-foreground mb-1">Earn points at</p>
           <h1 className="text-2xl font-bold">{merchant.business_name}</h1>
