@@ -35,7 +35,7 @@ export function PointsEarned({
   return (
     <Html>
       <Head />
-      <Preview>You earned {pointsEarned} points at {merchantName}</Preview>
+      <Preview>{`You earned ${pointsEarned} points at ${merchantName}`}</Preview>
       <Body style={main}>
         <Container style={container}>
           {merchantLogoUrl && (
