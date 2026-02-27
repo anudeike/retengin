@@ -86,6 +86,7 @@ export default async function MerchantDashboardPage() {
             { href: '/dashboard/redeem', label: 'Redeem Points' },
             { href: '/dashboard/customers', label: 'Customers' },
             { href: '/dashboard/rewards', label: 'Rewards' },
+            { href: '/dashboard/referrals', label: 'Referrals' },
             { href: '/dashboard/settings', label: 'Settings' },
           ].map(({ href, label }) => (
             <Button key={href} variant="outline" asChild className="h-auto py-4 flex flex-col">

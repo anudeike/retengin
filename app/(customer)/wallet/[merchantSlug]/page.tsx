@@ -1,12 +1,14 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { PointsHistory } from '@/components/customer/PointsHistory'
 import { RewardProgress } from '@/components/customer/RewardProgress'
 import { RealtimeWallet } from '@/components/customer/RealtimeWallet'
 import { RewardUnlockToast } from '@/components/customer/RewardUnlockToast'
+import { ReferralCard } from '@/components/customer/ReferralCard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { generateReferralCode } from '@/lib/referrals/code'
 
 interface Props {
   params: Promise<{ merchantSlug: string }>
@@ -23,10 +25,18 @@ export default async function MerchantWalletPage({ params }: Props) {
 
   const { data: customer } = await supabase
     .from('customers')
-    .select('id')
+    .select('id, referral_code')
     .eq('auth_user_id', user.id)
     .maybeSingle()
   if (!customer) redirect('/')
+
+  // Ensure referral code is generated
+  const service = createServiceRoleClient()
+  let referralCode = customer.referral_code
+  if (!referralCode) {
+    referralCode = generateReferralCode()
+    await service.from('customers').update({ referral_code: referralCode }).eq('id', customer.id)
+  }
 
   const { data: merchant } = await supabase
     .from('merchants')
@@ -77,6 +87,18 @@ export default async function MerchantWalletPage({ params }: Props) {
   for (const row of redemptionRows ?? []) {
     redemptions[row.reward_id] = (redemptions[row.reward_id] ?? 0) + 1
   }
+
+  // Referral stats for this merchant
+  const { data: referralRows } = await service
+    .from('referrals')
+    .select('status')
+    .eq('referrer_id', customer.id)
+    .eq('merchant_id', merchant.id)
+
+  const completedReferrals = (referralRows ?? []).filter((r) => r.status === 'completed').length
+  const pendingReferrals = (referralRows ?? []).filter((r) => r.status === 'wallet_created').length
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   return (
     <main className="min-h-screen bg-background">
@@ -129,6 +151,17 @@ export default async function MerchantWalletPage({ params }: Props) {
             <PointsHistory transactions={transactions ?? []} />
           </CardContent>
         </Card>
+
+        <div className="mt-4">
+          <ReferralCard
+            referralCode={referralCode!}
+            merchantSlug={merchant.slug}
+            merchantName={merchant.business_name}
+            appUrl={appUrl}
+            completedCount={completedReferrals}
+            pendingCount={pendingReferrals}
+          />
+        </div>
       </div>
     </main>
   )

@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { WalletCard } from '@/components/customer/WalletCard'
 import { ClosestRewards } from '@/components/customer/ClosestRewards'
 import { Card, CardContent } from '@/components/ui/card'
+import { generateReferralCode } from '@/lib/referrals/code'
 
 export default async function WalletPage() {
   const supabase = await createServerClient()
@@ -14,11 +15,31 @@ export default async function WalletPage() {
 
   const { data: customer } = await supabase
     .from('customers')
-    .select('id, display_name, email')
+    .select('id, display_name, email, referral_code')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
   if (!customer) redirect('/')
+
+  // Generate referral code lazily on first wallet load
+  const service = createServiceRoleClient()
+  let referralCode = customer.referral_code
+  if (!referralCode) {
+    referralCode = generateReferralCode()
+    await service
+      .from('customers')
+      .update({ referral_code: referralCode })
+      .eq('id', customer.id)
+  }
+
+  // Fetch referral summary stats
+  const { data: referralRows } = await service
+    .from('referrals')
+    .select('status')
+    .eq('referrer_id', customer.id)
+
+  const completedReferrals = (referralRows ?? []).filter((r) => r.status === 'completed').length
+  const pendingReferrals = (referralRows ?? []).filter((r) => r.status === 'wallet_created').length
 
   const { data: balances } = await supabase
     .from('customer_merchant_balances')
@@ -93,6 +114,30 @@ export default async function WalletPage() {
             </div>
           </>
         )}
+
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Share &amp; Earn
+        </h2>
+        <Card className="mb-6">
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground mb-3">
+              Refer friends to any merchant and both of you earn bonus points on their first purchase.
+            </p>
+            <div className="flex gap-6 text-center mb-3">
+              <div>
+                <p className="text-2xl font-bold">{completedReferrals}</p>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{pendingReferrals}</p>
+                <p className="text-xs text-muted-foreground">Pending</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Visit a merchant&apos;s wallet to share your referral QR code.
+            </p>
+          </CardContent>
+        </Card>
 
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           Your Points
