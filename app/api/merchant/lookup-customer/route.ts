@@ -64,9 +64,18 @@ export async function POST(request: Request) {
     .eq('is_active', true)
     .order('points_required', { ascending: true })
 
+  // Get pending referral reward grants for this customer+merchant
+  const { data: referralGrants } = await supabase
+    .from('referral_reward_grants')
+    .select('id, reward_type, reward_title, reward_value, granted_at, role')
+    .eq('customer_id', customer.id)
+    .eq('merchant_id', merchantId)
+    .eq('status', 'pending')
+
   return NextResponse.json({
     customerId: customer.id,
     balance: balanceRow?.balance ?? 0,
     rewards: rewards ?? [],
+    referralGrants: referralGrants ?? [],
   })
 }

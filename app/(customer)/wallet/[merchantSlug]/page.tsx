@@ -98,7 +98,24 @@ export default async function MerchantWalletPage({ params }: Props) {
   const completedReferrals = (referralRows ?? []).filter((r) => r.status === 'completed').length
   const pendingReferrals = (referralRows ?? []).filter((r) => r.status === 'wallet_created').length
 
+  // Pending referral reward grants for this customer at this merchant
+  const { data: referralGrants } = await service
+    .from('referral_reward_grants')
+    .select('id, reward_type, reward_title, reward_value, granted_at, role')
+    .eq('customer_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'pending')
+
+  // Referral program info for ReferralCard
+  const { data: referralProgram } = await service
+    .from('referral_programs')
+    .select('name, description, is_enabled')
+    .eq('merchant_id', merchant.id)
+    .maybeSingle()
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const programPageUrl =
+    referralProgram?.is_enabled ? `${appUrl}/join/${merchant.slug}/referral` : null
 
   return (
     <main className="min-h-screen bg-background">
@@ -152,6 +169,35 @@ export default async function MerchantWalletPage({ params }: Props) {
           </CardContent>
         </Card>
 
+        {(referralGrants ?? []).length > 0 && (
+          <Card className="mt-4">
+            <CardContent className="p-5">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Referral Rewards
+              </h2>
+              <div className="space-y-2">
+                {(referralGrants ?? []).map((grant) => (
+                  <div
+                    key={grant.id}
+                    className="flex items-center justify-between border border-dashed border-gray-300 rounded-lg px-3 py-2.5"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{grant.reward_title}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {grant.role} reward &middot;{' '}
+                        {new Date(grant.granted_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold bg-gray-900 text-white rounded-full px-2.5 py-1">
+                      Show to redeem
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mt-4">
           <ReferralCard
             referralCode={referralCode!}
@@ -160,6 +206,9 @@ export default async function MerchantWalletPage({ params }: Props) {
             appUrl={appUrl}
             completedCount={completedReferrals}
             pendingCount={pendingReferrals}
+            programName={referralProgram?.name ?? null}
+            programDescription={referralProgram?.description ?? null}
+            programPageUrl={programPageUrl}
           />
         </div>
       </div>

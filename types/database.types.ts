@@ -290,24 +290,42 @@ export type Database = {
       }
       referral_programs: {
         Row: {
+          clawback_on_refund: boolean
           created_at: string
+          description: string | null
+          ends_at: string | null
           id: string
           is_enabled: boolean
+          max_referrals_per_customer: number | null
           merchant_id: string
+          name: string | null
+          purchase_count_required: number
           updated_at: string
         }
         Insert: {
+          clawback_on_refund?: boolean
           created_at?: string
+          description?: string | null
+          ends_at?: string | null
           id?: string
           is_enabled?: boolean
+          max_referrals_per_customer?: number | null
           merchant_id: string
+          name?: string | null
+          purchase_count_required?: number
           updated_at?: string
         }
         Update: {
+          clawback_on_refund?: boolean
           created_at?: string
+          description?: string | null
+          ends_at?: string | null
           id?: string
           is_enabled?: boolean
+          max_referrals_per_customer?: number | null
           merchant_id?: string
+          name?: string | null
+          purchase_count_required?: number
           updated_at?: string
         }
         Relationships: [
@@ -320,32 +338,120 @@ export type Database = {
           },
         ]
       }
+      referral_reward_grants: {
+        Row: {
+          clawed_back_at: string | null
+          customer_id: string
+          granted_at: string
+          id: string
+          merchant_id: string
+          merchant_note: string | null
+          redeemed_at: string | null
+          referral_id: string
+          reward_title: string
+          reward_type: Database["public"]["Enums"]["referral_reward_type"]
+          reward_value: number | null
+          role: string
+          status: string
+        }
+        Insert: {
+          clawed_back_at?: string | null
+          customer_id: string
+          granted_at?: string
+          id?: string
+          merchant_id: string
+          merchant_note?: string | null
+          redeemed_at?: string | null
+          referral_id: string
+          reward_title: string
+          reward_type: Database["public"]["Enums"]["referral_reward_type"]
+          reward_value?: number | null
+          role: string
+          status?: string
+        }
+        Update: {
+          clawed_back_at?: string | null
+          customer_id?: string
+          granted_at?: string
+          id?: string
+          merchant_id?: string
+          merchant_note?: string | null
+          redeemed_at?: string | null
+          referral_id?: string
+          reward_title?: string
+          reward_type?: Database["public"]["Enums"]["referral_reward_type"]
+          reward_value?: number | null
+          role?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_reward_grants_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_reward_grants_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_reward_grants_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_spend_tiers: {
         Row: {
           id: string
           min_spend_cents: number
           referee_merchant_points: number
+          referee_reward_title: string | null
+          referee_reward_type: Database["public"]["Enums"]["referral_reward_type"]
+          referee_reward_value: number | null
           referee_taplo_points: number
           referral_program_id: string
           referrer_merchant_points: number
+          referrer_reward_title: string | null
+          referrer_reward_type: Database["public"]["Enums"]["referral_reward_type"]
+          referrer_reward_value: number | null
           referrer_taplo_points: number
         }
         Insert: {
           id?: string
           min_spend_cents?: number
           referee_merchant_points?: number
+          referee_reward_title?: string | null
+          referee_reward_type?: Database["public"]["Enums"]["referral_reward_type"]
+          referee_reward_value?: number | null
           referee_taplo_points?: number
           referral_program_id: string
           referrer_merchant_points?: number
+          referrer_reward_title?: string | null
+          referrer_reward_type?: Database["public"]["Enums"]["referral_reward_type"]
+          referrer_reward_value?: number | null
           referrer_taplo_points?: number
         }
         Update: {
           id?: string
           min_spend_cents?: number
           referee_merchant_points?: number
+          referee_reward_title?: string | null
+          referee_reward_type?: Database["public"]["Enums"]["referral_reward_type"]
+          referee_reward_value?: number | null
           referee_taplo_points?: number
           referral_program_id?: string
           referrer_merchant_points?: number
+          referrer_reward_title?: string | null
+          referrer_reward_type?: Database["public"]["Enums"]["referral_reward_type"]
+          referrer_reward_value?: number | null
           referrer_taplo_points?: number
         }
         Relationships: [
@@ -364,10 +470,12 @@ export type Database = {
           created_at: string
           first_purchase_cents: number | null
           id: string
+          invited_by_merchant: boolean
           merchant_id: string
+          purchase_count: number
           referee_email: string
           referee_id: string | null
-          referrer_id: string
+          referrer_id: string | null
           square_payment_id: string | null
           status: string
         }
@@ -376,10 +484,12 @@ export type Database = {
           created_at?: string
           first_purchase_cents?: number | null
           id?: string
+          invited_by_merchant?: boolean
           merchant_id: string
+          purchase_count?: number
           referee_email: string
           referee_id?: string | null
-          referrer_id: string
+          referrer_id?: string | null
           square_payment_id?: string | null
           status?: string
         }
@@ -388,10 +498,12 @@ export type Database = {
           created_at?: string
           first_purchase_cents?: number | null
           id?: string
+          invited_by_merchant?: boolean
           merchant_id?: string
+          purchase_count?: number
           referee_email?: string
           referee_id?: string | null
-          referrer_id?: string
+          referrer_id?: string | null
           square_payment_id?: string | null
           status?: string
         }
@@ -585,6 +697,7 @@ export type Database = {
     Enums: {
       app_role: "customer" | "merchant" | "admin"
       merchant_status: "pending" | "active" | "suspended"
+      referral_reward_type: "points" | "item" | "discount_percent" | "discount_flat"
       transaction_type: "earned" | "redeemed" | "reversed" | "admin_correction"
     }
     CompositeTypes: {
@@ -718,6 +831,7 @@ export const Constants = {
     Enums: {
       app_role: ["customer", "merchant", "admin"],
       merchant_status: ["pending", "active", "suspended"],
+      referral_reward_type: ["points", "item", "discount_percent", "discount_flat"],
       transaction_type: ["earned", "redeemed", "reversed", "admin_correction"],
     },
   },

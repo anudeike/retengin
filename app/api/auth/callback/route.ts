@@ -95,14 +95,15 @@ export async function GET(request: NextRequest) {
           .insert({ email, auth_user_id: user.id })
       }
 
-      // Handle referral if the new customer arrived via a referral link
-      if (refCode && merchantSlug) {
-        const { data: customerRecord } = await adminSupabase
-          .from('customers')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle()
+      // Resolve customer record (either just created or already existed)
+      const { data: customerRecord } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle()
 
+      // Handle referral if the new customer arrived via a referral link
+      if (refCode && merchantSlug && customerRecord) {
         const [{ data: referrer }, { data: merchantRecord }] = await Promise.all([
           adminSupabase
             .from('customers')
@@ -116,17 +117,48 @@ export async function GET(request: NextRequest) {
             .maybeSingle(),
         ])
 
-        if (customerRecord && referrer && merchantRecord) {
+        if (referrer && merchantRecord) {
           const isSelfReferral = referrer.email.toLowerCase() === email
-          // Unique constraint on (referee_email, merchant_id) silently handles duplicates
-          await adminSupabase.from('referrals').insert({
-            referrer_id: referrer.id,
-            referee_id: customerRecord.id,
-            merchant_id: merchantRecord.id,
-            referee_email: email,
-            status: isSelfReferral ? 'invalid' : 'wallet_created',
-          })
+          const newStatus = isSelfReferral ? 'invalid' : 'wallet_created'
+
+          // Check for existing merchant-invite row for this email+merchant
+          const { data: existingInvite } = await adminSupabase
+            .from('referrals')
+            .select('id, invited_by_merchant')
+            .eq('referee_email', email)
+            .eq('merchant_id', merchantRecord.id)
+            .maybeSingle()
+
+          if (existingInvite?.invited_by_merchant) {
+            // Upgrade the merchant-invite row with the real referrer
+            await adminSupabase
+              .from('referrals')
+              .update({
+                referrer_id: referrer.id,
+                referee_id: customerRecord.id,
+                status: newStatus,
+                invited_by_merchant: false,
+              })
+              .eq('id', existingInvite.id)
+          } else {
+            // Normal referral insert — unique constraint silently handles duplicates
+            await adminSupabase.from('referrals').insert({
+              referrer_id: referrer.id,
+              referee_id: customerRecord.id,
+              merchant_id: merchantRecord.id,
+              referee_email: email,
+              status: newStatus,
+            })
+          }
         }
+      } else if (!refCode && customerRecord) {
+        // No referral link — check if this customer was invited directly by a merchant
+        await adminSupabase
+          .from('referrals')
+          .update({ referee_id: customerRecord.id, status: 'wallet_created' })
+          .eq('referee_email', email)
+          .eq('status', 'pending')
+          .eq('invited_by_merchant', true)
       }
     }
 
