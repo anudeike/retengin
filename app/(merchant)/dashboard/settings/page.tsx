@@ -15,7 +15,7 @@ export default async function MerchantSettingsPage() {
 
   const { data: merchant } = await supabase
     .from('merchants')
-    .select('id, business_name, slug, contact_email, logo_url')
+    .select('id, business_name, slug, contact_email, logo_url, emails_enabled')
     .eq('auth_user_id', user.id)
     .maybeSingle()
   if (!merchant) redirect('/')
@@ -25,6 +25,16 @@ export default async function MerchantSettingsPage() {
     .select('*')
     .eq('merchant_id', merchant.id)
     .maybeSingle()
+
+  async function setEmailsEnabled(formData: FormData) {
+    'use server'
+    const enabled = formData.get('emails_enabled') === 'on'
+    const service = createServiceRoleClient()
+    await service
+      .from('merchants')
+      .update({ emails_enabled: enabled })
+      .eq('id', merchant!.id)
+  }
 
   async function saveRules(values: {
     points_per_dollar: number
@@ -62,7 +72,7 @@ export default async function MerchantSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="mb-4">
           <CardContent className="p-6">
             <h2 className="text-base font-semibold mb-4">Point rules</h2>
             <PointRuleForm
@@ -72,6 +82,27 @@ export default async function MerchantSettingsPage() {
               } : undefined}
               onSave={saveRules}
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-base font-semibold mb-1">Transactional emails</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              When enabled, Taplo sends your customers emails for points earned, reward unlocks, redemptions, and referrals.
+            </p>
+            <form action={setEmailsEnabled}>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="emails_enabled"
+                  defaultChecked={merchant.emails_enabled ?? true}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Send emails to customers</span>
+              </label>
+              <Button type="submit" size="sm" className="mt-4">Save</Button>
+            </form>
           </CardContent>
         </Card>
       </div>

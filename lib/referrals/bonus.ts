@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
-import { sendTransactionalEmail } from '@/lib/email/client'
-import { generateUnsubscribeToken } from '@/lib/email/unsubscribe-token'
+import { sendTransactionalEmail } from '@/lib/email/send'
+import { unsubscribeUrl } from '@/lib/email/unsubscribe-token'
 import {
   type RewardDisplay,
   renderReferralCompleted,
@@ -228,11 +228,10 @@ export async function awardReferralBonus(
     const referrerRow = referrerId ? customerRows.find((c) => c.id === referrerId) : null
 
     const sendEmail = async (
-      customer: { email: string; display_name: string | null },
+      customer: { id: string; email: string; display_name: string | null },
       role: 'referrer' | 'referee',
       reward: RewardDisplay,
     ) => {
-      const token = generateUnsubscribeToken(customer.email)
       const html = renderReferralCompleted({
         recipientName: customer.display_name ?? 'there',
         merchantName,
@@ -240,12 +239,14 @@ export async function awardReferralBonus(
         role,
         reward,
         walletUrl,
-        unsubscribeUrl: `${APP_URL}/unsubscribe?token=${token}`,
+        unsubscribeUrl: unsubscribeUrl(customer.id, merchantId),
       })
       await sendTransactionalEmail({
         to: customer.email,
         subject: `Your ${merchantName} referral reward is ready`,
         html,
+        customerId: customer.id,
+        merchantId,
       })
     }
 

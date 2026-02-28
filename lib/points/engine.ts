@@ -1,5 +1,11 @@
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { awardReferralBonus, clawbackReferralBonus } from '@/lib/referrals/bonus'
+import { sendTransactionalEmail } from '@/lib/email/send'
+import { unsubscribeUrl } from '@/lib/email/unsubscribe-token'
+import { render } from '@react-email/render'
+import { PointsEarned } from '@/lib/email/templates/PointsEarned'
+import { RewardUnlocked } from '@/lib/email/templates/RewardUnlocked'
+import React from 'react'
 
 // Square payment type (simplified subset of the full SDK type)
 interface SquarePayment {
@@ -51,7 +57,7 @@ export async function handlePaymentCompleted(
   // 1. Resolve merchant (must be active)
   const { data: merchant } = await supabase
     .from('merchants')
-    .select('id, status')
+    .select('id, status, business_name, logo_url, slug')
     .eq('square_merchant_id', squareMerchantId)
     .maybeSingle()
 
@@ -99,7 +105,16 @@ export async function handlePaymentCompleted(
     return
   }
 
-  // 6. Atomically award points (idempotent via unique index on square_payment_id)
+  // 6. Capture previous balance (needed for reward-unlock detection)
+  const { data: prevBalanceRow } = await supabase
+    .from('customer_merchant_balances')
+    .select('balance')
+    .eq('customer_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .maybeSingle()
+  const previousBalance = prevBalanceRow?.balance ?? 0
+
+  // 7. Atomically award points (idempotent via unique index on square_payment_id)
   const { error } = await supabase.rpc('award_points', {
     p_customer_id: customer.id,
     p_merchant_id: merchant.id,
@@ -121,6 +136,72 @@ export async function handlePaymentCompleted(
   console.log(
     `[engine] +${pointsEarned} pts awarded — customer: ${email} (${customer.id}), payment: ${payment.id}, amount: $${(amountCents / 100).toFixed(2)}`,
   )
+
+  const newBalance = previousBalance + pointsEarned
+
+  // 8. Fire transactional emails (fire-and-forget — don't block webhook response)
+  void (async () => {
+    const { data: fullCustomer } = await supabase
+      .from('customers')
+      .select('email, display_name')
+      .eq('id', customer.id)
+      .single()
+    if (!fullCustomer) return
+
+    const customerName = fullCustomer.display_name ?? fullCustomer.email
+    const unsub = unsubscribeUrl(customer.id, merchant.id)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+    const walletUrl = `${appUrl}/wallet/${merchant.slug ?? ''}`
+
+    // PointsEarned email
+    const pointsHtml = await render(
+      React.createElement(PointsEarned, {
+        customerName,
+        merchantName: merchant.business_name,
+        merchantLogoUrl: merchant.logo_url,
+        pointsEarned,
+        newBalance,
+        walletUrl,
+        unsubscribeUrl: unsub,
+      }),
+    )
+    await sendTransactionalEmail({
+      to: fullCustomer.email,
+      subject: `You earned ${pointsEarned} points at ${merchant.business_name}`,
+      html: pointsHtml,
+      customerId: customer.id,
+      merchantId: merchant.id,
+    })
+
+    // RewardUnlocked emails — any reward whose threshold was crossed by this payment
+    const { data: rewards } = await supabase
+      .from('rewards')
+      .select('id, name, points_required')
+      .eq('merchant_id', merchant.id)
+      .eq('is_active', true)
+      .gt('points_required', previousBalance)
+      .lte('points_required', newBalance)
+
+    for (const reward of rewards ?? []) {
+      const unlockedHtml = await render(
+        React.createElement(RewardUnlocked, {
+          customerName,
+          merchantName: merchant.business_name,
+          merchantLogoUrl: merchant.logo_url,
+          rewardName: reward.name,
+          walletUrl,
+          unsubscribeUrl: unsub,
+        }),
+      )
+      await sendTransactionalEmail({
+        to: fullCustomer.email,
+        subject: `Reward unlocked at ${merchant.business_name}: ${reward.name}`,
+        html: unlockedHtml,
+        customerId: customer.id,
+        merchantId: merchant.id,
+      })
+    }
+  })()
 
   // Check for an open referral (status=wallet_created) for this customer at this merchant.
   const { data: openReferral } = await supabase
