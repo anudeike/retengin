@@ -141,6 +141,7 @@ export async function handlePaymentCompleted(
 
   // 8. Fire transactional emails (fire-and-forget — don't block webhook response)
   void (async () => {
+    if (!process.env.RESEND_API_KEY) return // skip in test environments
     const { data: fullCustomer } = await supabase
       .from('customers')
       .select('email, display_name')

@@ -8,6 +8,12 @@ export function createSupabaseMock() {
   const chain = {
     select:      vi.fn().mockReturnThis(),
     eq:          vi.fn().mockReturnThis(),
+    neq:         vi.fn().mockReturnThis(),
+    gt:          vi.fn().mockReturnThis(),
+    gte:         vi.fn().mockReturnThis(),
+    lt:          vi.fn().mockReturnThis(),
+    lte:         vi.fn().mockReturnThis(),
+    in:          vi.fn().mockReturnThis(),
     order:       vi.fn().mockImplementation(() =>
       Promise.resolve(responses[currentTable] ?? { data: null, error: null }),
     ),
