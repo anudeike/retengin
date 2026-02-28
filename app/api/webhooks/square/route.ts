@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifySquareWebhookSignature } from '@/lib/square/webhooks'
-import { handlePaymentCompleted, handleRefundCreated } from '@/lib/points/engine'
+import { handlePaymentCompleted, handleRefundCreated, handleInvoicePaymentMade } from '@/lib/points/engine'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -51,10 +51,19 @@ export async function POST(request: Request) {
   const object = (data['object'] as Record<string, unknown>) ?? {}
 
   if (merchantId) {
-    if (eventType === 'payment.completed') {
+    if (eventType === 'payment.updated') {
       const payment = object['payment'] as Record<string, unknown>
-      handlePaymentCompleted(merchantId, payment as never).catch((err) =>
-        console.error('[webhook] handlePaymentCompleted error:', err),
+      // Only process when payment reaches COMPLETED status — payment.updated fires
+      // on every field change (fee calculation, authorization, etc.)
+      if (payment?.['status'] === 'COMPLETED') {
+        handlePaymentCompleted(merchantId, payment as never).catch((err) =>
+          console.error('[webhook] handlePaymentCompleted error:', err),
+        )
+      }
+    } else if (eventType === 'invoice.payment_made') {
+      const invoice = object['invoice'] as Record<string, unknown>
+      handleInvoicePaymentMade(merchantId, invoice as never).catch((err) =>
+        console.error('[webhook] handleInvoicePaymentMade error:', err),
       )
     } else if (eventType === 'refund.created') {
       const refund = object['refund'] as Record<string, unknown>

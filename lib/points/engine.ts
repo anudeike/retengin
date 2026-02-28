@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from '@/lib/supabase/server'
-import { awardReferralBonus } from '@/lib/referrals/bonus'
+import { awardReferralBonus, clawbackReferralBonus } from '@/lib/referrals/bonus'
 
 // Square payment type (simplified subset of the full SDK type)
 interface SquarePayment {
@@ -21,8 +21,22 @@ interface SquareRefund {
   } | null
 }
 
+// Square invoice type (subset used by invoice.payment_made)
+interface SquareInvoice {
+  id: string
+  order_id?: string | null
+  primary_recipient?: {
+    email_address?: string | null
+  } | null
+  payment_requests?: Array<{
+    total_completed_amount_money?: {
+      amount?: bigint | number | null
+    } | null
+  }> | null
+}
+
 /**
- * Processes a Square `payment.completed` event:
+ * Processes a Square `payment.updated` (status=COMPLETED) event:
  * 1. Resolves the merchant by Square merchant ID.
  * 2. Looks up/creates the customer by email.
  * 3. Calculates points from merchant rules.
@@ -97,31 +111,52 @@ export async function handlePaymentCompleted(
   if (error) {
     // Duplicate key = already processed — safe to ignore
     if (error.code === '23505') {
+      console.log(`[engine] payment ${payment.id} already processed — skipping`)
       return
     }
     console.error('[engine] award_points error:', error)
+    return
   }
 
+  console.log(
+    `[engine] +${pointsEarned} pts awarded — customer: ${email} (${customer.id}), payment: ${payment.id}, amount: $${(amountCents / 100).toFixed(2)}`,
+  )
+
   // Check for an open referral (status=wallet_created) for this customer at this merchant.
-  // Only fires on first earned transaction — the referral status change to 'completed'
-  // prevents it from firing again.
   const { data: openReferral } = await supabase
     .from('referrals')
-    .select('id, referrer_id')
+    .select('id, referrer_id, purchase_count')
     .eq('referee_id', customer.id)
     .eq('merchant_id', merchant.id)
     .eq('status', 'wallet_created')
     .maybeSingle()
 
   if (openReferral) {
-    await awardReferralBonus(
-      openReferral.id,
-      openReferral.referrer_id,
-      customer.id,
-      merchant.id,
-      amountCents,
-      supabase,
-    )
+    // Fetch purchase_count_required from the referral program
+    const { data: program } = await supabase
+      .from('referral_programs')
+      .select('purchase_count_required')
+      .eq('merchant_id', merchant.id)
+      .maybeSingle()
+
+    const required = program?.purchase_count_required ?? 1
+    const newCount = (openReferral.purchase_count ?? 0) + 1
+
+    // Increment purchase_count on every qualifying payment
+    await supabase.from('referrals').update({ purchase_count: newCount }).eq('id', openReferral.id)
+
+    // Only fire bonus on the Nth qualifying purchase
+    if (newCount >= required) {
+      await awardReferralBonus(
+        openReferral.id,
+        openReferral.referrer_id,
+        customer.id,
+        merchant.id,
+        amountCents,
+        payment.id,
+        supabase,
+      )
+    }
   }
 }
 
@@ -192,4 +227,179 @@ export async function handleRefundCreated(
     square_payment_id: refund.payment_id,
     note: `Refund ${refund.id}`,
   })
+
+  console.log(
+    `[engine] ${reversalPoints} pts reversed — customer: ${original.customer_id}, refund: ${refund.id}, new balance: ${newBalance}`,
+  )
+
+  // 6. Clawback referral bonus if the refunded payment triggered one
+  const { data: completedReferral } = await supabase
+    .from('referrals')
+    .select('id, referrer_id, referee_id')
+    .eq('square_payment_id', refund.payment_id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'completed')
+    .maybeSingle()
+
+  if (completedReferral) {
+    const { data: program } = await supabase
+      .from('referral_programs')
+      .select('clawback_on_refund')
+      .eq('merchant_id', merchant.id)
+      .maybeSingle()
+
+    if (program?.clawback_on_refund) {
+      await clawbackReferralBonus(
+        completedReferral.id,
+        completedReferral.referrer_id,
+        completedReferral.referee_id,
+        merchant.id,
+        supabase,
+      )
+    }
+  }
+}
+
+/**
+ * Processes a Square `invoice.payment_made` event.
+ * Same flow as handlePaymentCompleted but reads email and amount from the invoice object.
+ *
+ * Double-fire guard: Square also sends a payment.updated (status=COMPLETED) for invoice
+ * payments. We check square_order_id in point_transactions — whichever event fires first
+ * awards the points; the second is skipped.
+ */
+export async function handleInvoicePaymentMade(
+  squareMerchantId: string,
+  invoice: SquareInvoice,
+): Promise<void> {
+  const supabase = createServiceRoleClient()
+
+  // 1. Resolve merchant (must be active)
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id, status')
+    .eq('square_merchant_id', squareMerchantId)
+    .maybeSingle()
+
+  if (!merchant || merchant.status !== 'active') {
+    return
+  }
+
+  // 2. Get customer email from invoice recipient
+  const email = invoice.primary_recipient?.email_address?.toLowerCase().trim()
+  if (!email) {
+    console.warn(`[engine] invoice ${invoice.id} has no recipient email — skipping`)
+    return
+  }
+
+  // 3. Double-fire guard: if payment.updated already awarded points for this order, skip
+  if (invoice.order_id) {
+    const { data: existing } = await supabase
+      .from('point_transactions')
+      .select('id')
+      .eq('square_order_id', invoice.order_id)
+      .eq('merchant_id', merchant.id)
+      .eq('transaction_type', 'earned')
+      .maybeSingle()
+
+    if (existing) {
+      console.log(`[engine] invoice ${invoice.id} order already credited via payment.updated — skipping`)
+      return
+    }
+  }
+
+  // 4. Upsert customer stub
+  const { data: customer } = await supabase
+    .from('customers')
+    .upsert({ email }, { onConflict: 'email' })
+    .select('id')
+    .single()
+
+  if (!customer) {
+    console.error('[engine] Failed to upsert customer for email:', email)
+    return
+  }
+
+  // 5. Get merchant point rules
+  const { data: rules } = await supabase
+    .from('merchant_point_rules')
+    .select('points_per_dollar, min_spend_cents, is_active')
+    .eq('merchant_id', merchant.id)
+    .maybeSingle()
+
+  if (!rules?.is_active) {
+    return
+  }
+
+  // 6. Calculate amount — sum total_completed_amount_money across all payment requests
+  const amountCents = (invoice.payment_requests ?? []).reduce(
+    (sum, req) => sum + Number(req.total_completed_amount_money?.amount ?? 0),
+    0,
+  )
+
+  if (amountCents < rules.min_spend_cents) {
+    return
+  }
+
+  const pointsEarned = Math.floor((amountCents / 100) * Number(rules.points_per_dollar))
+  if (pointsEarned <= 0) {
+    return
+  }
+
+  // 7. Award points — use inv:<id> as the payment ID for idempotency
+  const invoicePaymentId = `inv:${invoice.id}`
+  const { error } = await supabase.rpc('award_points', {
+    p_customer_id: customer.id,
+    p_merchant_id: merchant.id,
+    p_points: pointsEarned,
+    p_square_payment_id: invoicePaymentId,
+    p_square_order_id: invoice.order_id ?? undefined,
+  })
+
+  if (error) {
+    if (error.code === '23505') {
+      console.log(`[engine] invoice ${invoice.id} already processed — skipping`)
+      return
+    }
+    console.error('[engine] award_points error (invoice):', error)
+    return
+  }
+
+  console.log(
+    `[engine] +${pointsEarned} pts awarded — customer: ${email} (${customer.id}), invoice: ${invoice.id}, amount: $${(amountCents / 100).toFixed(2)}`,
+  )
+
+  // 8. Check for open referral (with purchase count tracking, same as payment flow)
+  const { data: openReferral } = await supabase
+    .from('referrals')
+    .select('id, referrer_id, purchase_count')
+    .eq('referee_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'wallet_created')
+    .maybeSingle()
+
+  if (openReferral) {
+    const { data: program } = await supabase
+      .from('referral_programs')
+      .select('purchase_count_required')
+      .eq('merchant_id', merchant.id)
+      .maybeSingle()
+
+    const required = program?.purchase_count_required ?? 1
+    const newCount = (openReferral.purchase_count ?? 0) + 1
+
+    await supabase.from('referrals').update({ purchase_count: newCount }).eq('id', openReferral.id)
+
+    if (newCount >= required) {
+      await awardReferralBonus(
+        openReferral.id,
+        openReferral.referrer_id,
+        customer.id,
+        merchant.id,
+        amountCents,
+        invoicePaymentId,
+        supabase,
+      )
+    }
+  }
 }

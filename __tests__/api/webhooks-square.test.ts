@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSupabaseMock } from '@/tests/mocks/supabase'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { verifySquareWebhookSignature } from '@/lib/square/webhooks'
-import { handlePaymentCompleted, handleRefundCreated } from '@/lib/points/engine'
+import { handlePaymentCompleted, handleRefundCreated, handleInvoicePaymentMade } from '@/lib/points/engine'
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceRoleClient: vi.fn(),
@@ -14,8 +14,9 @@ vi.mock('@/lib/square/webhooks', () => ({
 }))
 
 vi.mock('@/lib/points/engine', () => ({
-  handlePaymentCompleted: vi.fn().mockResolvedValue(undefined),
-  handleRefundCreated:    vi.fn().mockResolvedValue(undefined),
+  handlePaymentCompleted:     vi.fn().mockResolvedValue(undefined),
+  handleRefundCreated:        vi.fn().mockResolvedValue(undefined),
+  handleInvoicePaymentMade:   vi.fn().mockResolvedValue(undefined),
 }))
 
 // Import the route AFTER mocks are declared
@@ -42,7 +43,7 @@ describe('POST /api/webhooks/square', () => {
 
   it('returns 401 when signature verification fails', async () => {
     vi.mocked(verifySquareWebhookSignature).mockResolvedValue(false)
-    const res = await POST(makeRequest({ event_id: 'evt-1', type: 'payment.completed' }))
+    const res = await POST(makeRequest({ event_id: 'evt-1', type: 'payment.updated' }))
     expect(res.status).toBe(401)
   })
 
@@ -56,7 +57,7 @@ describe('POST /api/webhooks/square', () => {
   })
 
   it('returns 400 when event_id is missing from body', async () => {
-    const res = await POST(makeRequest({ type: 'payment.completed' })) // no event_id
+    const res = await POST(makeRequest({ type: 'payment.updated' })) // no event_id
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/event_id/i)
@@ -67,17 +68,17 @@ describe('POST /api/webhooks/square', () => {
       data: null,
       error: { code: '23505', message: 'duplicate key' },
     })
-    const res = await POST(makeRequest({ event_id: 'evt-dup', type: 'payment.completed' }))
+    const res = await POST(makeRequest({ event_id: 'evt-dup', type: 'payment.updated' }))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.received).toBe(true)
   })
 
-  it('returns 200 and calls handlePaymentCompleted for payment.completed', async () => {
-    const payment = { id: 'pay-1', buyer_email_address: 'user@example.com', amount_money: { amount: 1000 } }
+  it('returns 200 and calls handlePaymentCompleted for payment.updated with status COMPLETED', async () => {
+    const payment = { id: 'pay-1', status: 'COMPLETED', buyer_email_address: 'user@example.com', amount_money: { amount: 1000 } }
     const res = await POST(makeRequest({
       event_id: 'evt-pay',
-      type: 'payment.completed',
+      type: 'payment.updated',
       merchant_id: 'sq-merchant-1',
       data: { object: { payment } },
     }))
@@ -85,6 +86,19 @@ describe('POST /api/webhooks/square', () => {
     // Flush microtasks so fire-and-forget handler is called
     await new Promise((r) => setTimeout(r, 0))
     expect(handlePaymentCompleted).toHaveBeenCalledWith('sq-merchant-1', payment)
+  })
+
+  it('does NOT call handlePaymentCompleted for payment.updated with non-COMPLETED status', async () => {
+    const payment = { id: 'pay-2', status: 'APPROVED', buyer_email_address: 'user@example.com', amount_money: { amount: 1000 } }
+    const res = await POST(makeRequest({
+      event_id: 'evt-pay-approved',
+      type: 'payment.updated',
+      merchant_id: 'sq-merchant-1',
+      data: { object: { payment } },
+    }))
+    expect(res.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(handlePaymentCompleted).not.toHaveBeenCalled()
   })
 
   it('returns 200 and calls handleRefundCreated for refund.created', async () => {
@@ -98,6 +112,24 @@ describe('POST /api/webhooks/square', () => {
     expect(res.status).toBe(200)
     await new Promise((r) => setTimeout(r, 0))
     expect(handleRefundCreated).toHaveBeenCalledWith('sq-merchant-1', refund)
+  })
+
+  it('returns 200 and calls handleInvoicePaymentMade for invoice.payment_made', async () => {
+    const invoice = {
+      id: 'inv:abc123',
+      order_id: 'order-1',
+      primary_recipient: { email_address: 'user@example.com' },
+      payment_requests: [{ total_completed_amount_money: { amount: 10000 } }],
+    }
+    const res = await POST(makeRequest({
+      event_id: 'evt-invoice',
+      type: 'invoice.payment_made',
+      merchant_id: 'sq-merchant-1',
+      data: { object: { invoice } },
+    }))
+    expect(res.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(handleInvoicePaymentMade).toHaveBeenCalledWith('sq-merchant-1', invoice)
   })
 
   it('returns 200 without calling any handler for unknown event type', async () => {
@@ -122,9 +154,9 @@ describe('POST /api/webhooks/square', () => {
 
     const res = await POST(makeRequest({
       event_id: 'evt-slow',
-      type: 'payment.completed',
+      type: 'payment.updated',
       merchant_id: 'sq-merchant-1',
-      data: { object: { payment: {} } },
+      data: { object: { payment: { status: 'COMPLETED' } } },
     }))
 
     // Response is immediate

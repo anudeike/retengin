@@ -11,6 +11,9 @@ interface ReferralCardProps {
   appUrl: string
   completedCount: number
   pendingCount: number
+  programName: string | null
+  programDescription: string | null
+  programPageUrl: string | null
 }
 
 export function ReferralCard({
@@ -20,6 +23,9 @@ export function ReferralCard({
   appUrl,
   completedCount,
   pendingCount,
+  programName,
+  programDescription,
+  programPageUrl,
 }: ReferralCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [copied, setCopied] = useState(false)
@@ -54,9 +60,12 @@ export function ReferralCard({
   return (
     <Card>
       <CardContent className="p-5">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-          Share &amp; Earn at {merchantName}
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+          {programName ?? `Share & Earn at ${merchantName}`}
         </h2>
+        {programDescription && (
+          <p className="text-sm text-muted-foreground mb-3">{programDescription}</p>
+        )}
 
         <div className="flex flex-col items-center gap-3 mb-4">
           <Card className="border">
@@ -86,6 +95,17 @@ export function ReferralCard({
             <p className="text-xs text-muted-foreground">Pending</p>
           </div>
         </div>
+
+        {programPageUrl && (
+          <div className="mt-3 text-center">
+            <a
+              href={programPageUrl}
+              className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+            >
+              See program details →
+            </a>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
