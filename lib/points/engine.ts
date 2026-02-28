@@ -21,6 +21,20 @@ interface SquareRefund {
   } | null
 }
 
+// Square invoice type (subset used by invoice.payment_made)
+interface SquareInvoice {
+  id: string
+  order_id?: string | null
+  primary_recipient?: {
+    email_address?: string | null
+  } | null
+  payment_requests?: Array<{
+    total_completed_amount_money?: {
+      amount?: bigint | number | null
+    } | null
+  }> | null
+}
+
 /**
  * Processes a Square `payment.completed` event:
  * 1. Resolves the merchant by Square merchant ID.
@@ -97,10 +111,16 @@ export async function handlePaymentCompleted(
   if (error) {
     // Duplicate key = already processed — safe to ignore
     if (error.code === '23505') {
+      console.log(`[engine] payment ${payment.id} already processed — skipping`)
       return
     }
     console.error('[engine] award_points error:', error)
+    return
   }
+
+  console.log(
+    `[engine] +${pointsEarned} pts awarded — customer: ${email} (${customer.id}), payment: ${payment.id}, amount: $${(amountCents / 100).toFixed(2)}`,
+  )
 
   // Check for an open referral (status=wallet_created) for this customer at this merchant.
   // Only fires on first earned transaction — the referral status change to 'completed'
@@ -192,4 +212,138 @@ export async function handleRefundCreated(
     square_payment_id: refund.payment_id,
     note: `Refund ${refund.id}`,
   })
+
+  console.log(
+    `[engine] ${reversalPoints} pts reversed — customer: ${original.customer_id}, refund: ${refund.id}, new balance: ${newBalance}`,
+  )
+}
+
+/**
+ * Processes a Square `invoice.payment_made` event.
+ * Same flow as handlePaymentCompleted but reads email and amount from the invoice object.
+ *
+ * Double-fire guard: Square also sends a payment.updated (status=COMPLETED) for invoice
+ * payments. We check square_order_id in point_transactions — whichever event fires first
+ * awards the points; the second is skipped.
+ */
+export async function handleInvoicePaymentMade(
+  squareMerchantId: string,
+  invoice: SquareInvoice,
+): Promise<void> {
+  const supabase = createServiceRoleClient()
+
+  // 1. Resolve merchant (must be active)
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id, status')
+    .eq('square_merchant_id', squareMerchantId)
+    .maybeSingle()
+
+  if (!merchant || merchant.status !== 'active') {
+    return
+  }
+
+  // 2. Get customer email from invoice recipient
+  const email = invoice.primary_recipient?.email_address?.toLowerCase().trim()
+  if (!email) {
+    console.warn(`[engine] invoice ${invoice.id} has no recipient email — skipping`)
+    return
+  }
+
+  // 3. Double-fire guard: if payment.updated already awarded points for this order, skip
+  if (invoice.order_id) {
+    const { data: existing } = await supabase
+      .from('point_transactions')
+      .select('id')
+      .eq('square_order_id', invoice.order_id)
+      .eq('merchant_id', merchant.id)
+      .eq('transaction_type', 'earned')
+      .maybeSingle()
+
+    if (existing) {
+      console.log(`[engine] invoice ${invoice.id} order already credited via payment.updated — skipping`)
+      return
+    }
+  }
+
+  // 4. Upsert customer stub
+  const { data: customer } = await supabase
+    .from('customers')
+    .upsert({ email }, { onConflict: 'email' })
+    .select('id')
+    .single()
+
+  if (!customer) {
+    console.error('[engine] Failed to upsert customer for email:', email)
+    return
+  }
+
+  // 5. Get merchant point rules
+  const { data: rules } = await supabase
+    .from('merchant_point_rules')
+    .select('points_per_dollar, min_spend_cents, is_active')
+    .eq('merchant_id', merchant.id)
+    .maybeSingle()
+
+  if (!rules?.is_active) {
+    return
+  }
+
+  // 6. Calculate amount — sum total_completed_amount_money across all payment requests
+  const amountCents = (invoice.payment_requests ?? []).reduce(
+    (sum, req) => sum + Number(req.total_completed_amount_money?.amount ?? 0),
+    0,
+  )
+
+  if (amountCents < rules.min_spend_cents) {
+    return
+  }
+
+  const pointsEarned = Math.floor((amountCents / 100) * Number(rules.points_per_dollar))
+  if (pointsEarned <= 0) {
+    return
+  }
+
+  // 7. Award points — use inv:<id> as the payment ID for idempotency
+  const invoicePaymentId = `inv:${invoice.id}`
+  const { error } = await supabase.rpc('award_points', {
+    p_customer_id: customer.id,
+    p_merchant_id: merchant.id,
+    p_points: pointsEarned,
+    p_square_payment_id: invoicePaymentId,
+    p_square_order_id: invoice.order_id ?? undefined,
+  })
+
+  if (error) {
+    if (error.code === '23505') {
+      console.log(`[engine] invoice ${invoice.id} already processed — skipping`)
+      return
+    }
+    console.error('[engine] award_points error (invoice):', error)
+    return
+  }
+
+  console.log(
+    `[engine] +${pointsEarned} pts awarded — customer: ${email} (${customer.id}), invoice: ${invoice.id}, amount: $${(amountCents / 100).toFixed(2)}`,
+  )
+
+  // 8. Check for open referral (same as payment flow)
+  const { data: openReferral } = await supabase
+    .from('referrals')
+    .select('id, referrer_id')
+    .eq('referee_id', customer.id)
+    .eq('merchant_id', merchant.id)
+    .eq('status', 'wallet_created')
+    .maybeSingle()
+
+  if (openReferral) {
+    await awardReferralBonus(
+      openReferral.id,
+      openReferral.referrer_id,
+      customer.id,
+      merchant.id,
+      amountCents,
+      supabase,
+    )
+  }
 }
