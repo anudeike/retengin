@@ -111,6 +111,41 @@ export type Database = {
           },
         ]
       }
+      loyalty_checkins: {
+        Row: {
+          id: string
+          merchant_id: string
+          email: string
+          created_at: string
+          claimed_at: string | null
+          payment_id: string | null
+        }
+        Insert: {
+          id?: string
+          merchant_id: string
+          email: string
+          created_at?: string
+          claimed_at?: string | null
+          payment_id?: string | null
+        }
+        Update: {
+          id?: string
+          merchant_id?: string
+          email?: string
+          created_at?: string
+          claimed_at?: string | null
+          payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_checkins_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       customers: {
         Row: {
           auth_user_id: string | null

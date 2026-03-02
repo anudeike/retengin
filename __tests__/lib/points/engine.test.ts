@@ -161,6 +161,55 @@ describe('handlePaymentCompleted', () => {
       p_points: 20, // 2000 cents / 100 * 1 = 20
     }))
   })
+
+  it('uses check-in fallback when buyer_email_address is absent and a recent unclaimed check-in exists', async () => {
+    const CHECKIN_ID = 'checkin-uuid-001'
+    const CHECKIN_EMAIL = 'checkin@example.com'
+
+    mockClient._setResponse('loyalty_checkins', {
+      data: { id: CHECKIN_ID, email: CHECKIN_EMAIL },
+      error: null,
+    })
+    // customer response for the checkin email
+    mockClient._setResponse('customers', { data: { id: CUSTOMER_ID }, error: null })
+
+    await handlePaymentCompleted(
+      SQUARE_MERCHANT_ID,
+      makePayment({ buyer_email_address: null }),
+    )
+
+    // Points should be awarded to the check-in email
+    expect(mockClient._chain.upsert).toHaveBeenCalledWith(
+      { email: CHECKIN_EMAIL },
+      expect.anything(),
+    )
+    expect(mockClient.rpc).toHaveBeenCalledWith('award_points', expect.objectContaining({
+      p_customer_id: CUSTOMER_ID,
+      p_merchant_id: MERCHANT_ID,
+    }))
+    // loyalty_checkins update called to mark as claimed
+    expect(mockClient._chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_id: 'payment-id-001' }),
+    )
+  })
+
+  it('does not query loyalty_checkins when buyer_email_address is present', async () => {
+    await handlePaymentCompleted(SQUARE_MERCHANT_ID, makePayment())
+
+    expect(mockClient.from).not.toHaveBeenCalledWith('loyalty_checkins')
+  })
+
+  it('returns early without awarding points when both buyer_email_address and check-in are absent', async () => {
+    mockClient._setResponse('loyalty_checkins', { data: null, error: null })
+
+    await handlePaymentCompleted(
+      SQUARE_MERCHANT_ID,
+      makePayment({ buyer_email_address: null }),
+    )
+
+    expect(mockClient._chain.upsert).not.toHaveBeenCalled()
+    expect(mockClient.rpc).not.toHaveBeenCalled()
+  })
 })
 
 describe('handleRefundCreated', () => {

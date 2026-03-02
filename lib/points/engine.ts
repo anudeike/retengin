@@ -66,7 +66,30 @@ export async function handlePaymentCompleted(
   }
 
   // 2. Get customer email from payment
-  const email = payment.buyer_email_address?.toLowerCase().trim()
+  let email = payment.buyer_email_address?.toLowerCase().trim()
+
+  if (!email) {
+    // Fallback: most recent unclaimed check-in at this merchant (FIFO, 30-min window)
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    const { data: checkin } = await supabase
+      .from('loyalty_checkins')
+      .select('id, email')
+      .eq('merchant_id', merchant.id)
+      .is('claimed_at', null)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: true })  // FIFO: oldest unclaimed wins
+      .limit(1)
+      .maybeSingle()
+
+    if (checkin) {
+      email = checkin.email
+      void supabase
+        .from('loyalty_checkins')
+        .update({ claimed_at: new Date().toISOString(), payment_id: payment.id })
+        .eq('id', checkin.id)
+    }
+  }
+
   if (!email) {
     return // No email = no points
   }

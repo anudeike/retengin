@@ -6,12 +6,13 @@ import { Card, CardContent } from '@/components/ui/card'
 interface QRCodeDisplayProps {
   slug: string
   appUrl: string
+  url?: string
   size?: number
 }
 
-export function QRCodeDisplay({ slug, appUrl, size = 200 }: QRCodeDisplayProps) {
+export function QRCodeDisplay({ slug, appUrl, url, size = 200 }: QRCodeDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const joinUrl = `${appUrl}/join/${slug}`
+  const joinUrl = url ?? `${appUrl}/join/${slug}`
 
   useEffect(() => {
     if (!canvasRef.current) return

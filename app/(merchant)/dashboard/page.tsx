@@ -128,6 +128,24 @@ export default async function MerchantDashboardPage() {
             <QRCodeDisplay slug={merchant.slug} appUrl={appUrl} />
           </CardContent>
         </Card>
+
+        {merchant.slug && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div>
+                <p className="font-medium text-sm">Customer Check-in QR Code</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Display at your counter. Customers scan to earn points without needing a profile on file.
+                </p>
+              </div>
+              <QRCodeDisplay
+                slug={merchant.slug}
+                appUrl={appUrl}
+                url={`${appUrl}/checkin/${merchant.slug}`}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   )

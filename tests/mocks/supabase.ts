@@ -14,9 +14,21 @@ export function createSupabaseMock() {
     lt:          vi.fn().mockReturnThis(),
     lte:         vi.fn().mockReturnThis(),
     in:          vi.fn().mockReturnThis(),
-    order:       vi.fn().mockImplementation(() =>
-      Promise.resolve(responses[currentTable] ?? { data: null, error: null }),
-    ),
+    is:          vi.fn().mockReturnThis(),
+    // order returns a thenable so it can be:
+    //   1. awaited directly  (await ...order(...))          — existing usage
+    //   2. continued with further chain (.limit(1).maybeSingle()) — new checkin query
+    order: vi.fn().mockImplementation(() => {
+      const tableResponse = responses[currentTable] ?? { data: null, error: null }
+      return Object.assign({}, chain, {
+        then(
+          resolve: (v: unknown) => unknown,
+          reject?: (e: unknown) => unknown,
+        ) {
+          return Promise.resolve(tableResponse).then(resolve, reject)
+        },
+      })
+    }),
     limit:       vi.fn().mockReturnThis(),
     ilike:       vi.fn().mockReturnThis(),
     update:      vi.fn().mockReturnThis(),
